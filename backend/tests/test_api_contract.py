@@ -131,3 +131,11 @@ def test_menopause_pattern_scenario_is_not_escalated_as_apnea():
     assert d["apnea_score"]["tier"] == "Low"
     risks = {r["risk_id"]: r["tier"] for r in d["risk_assessment"]["risks"]}
     assert risks["menopause"] != "Low" and risks["sleep_disordered_breathing"] != "High"
+
+
+def test_travel_scenarios_are_not_scored_as_apnea():
+    for pid, context in (("SYN-ALTITUDE", "altitude"), ("SYN-JETLAG", "jetlag")):
+        d = analyze(persona_id=pid).json()
+        assert d["apnea_score"]["tier"] == "Low", pid
+        assert any("not counted because of travel" in f and context in f for f in d["apnea_score"]["top_factors"]), pid
+    assert analyze(persona_id="SYN-APNEA").json()["apnea_score"]["tier"] in ("Moderate", "High")

@@ -54,6 +54,13 @@ TREND_SIGNALS: dict[str, tuple[str, int]] = {
     "sleep_efficiency_pct": ("Sleep efficiency", -1),
 }
 
+# A travel context explains some wearable changes, so they are not counted as signs of apnea.
+# Altitude lowers SpO2 and raises breathing rate; crossing time zones disturbs sleep timing and quality.
+TRAVEL_EXPLAINS = {
+    "altitude": ("spo2_pct", "respiratory_rate_rpm"),
+    "jetlag": ("disturbance_count", "sleep_efficiency_pct"),
+}
+
 ITEM_LABELS = {
     "snoring": "snoring",
     "tired": "daytime tiredness",
@@ -88,6 +95,18 @@ class ApneaDecision:
     evidence_note: str
     model_score: float | None = None  # uncalibrated; never display as a percentage
     raise_reasons: list[str] = field(default_factory=list)
+
+
+def travel_suppressions(quality_flags: Sequence[str]) -> dict[str, str]:
+    """Trend keys explained by travel flags such as "travel:altitude:2500m" or "travel:jetlag:+8h"."""
+    out: dict[str, str] = {}
+    for flag in quality_flags:
+        parts = flag.split(":")
+        if len(parts) >= 3 and parts[0] == "travel" and parts[1] in TRAVEL_EXPLAINS:
+            context = f"{parts[1]} {parts[2]}"
+            for key in TRAVEL_EXPLAINS[parts[1]]:
+                out.setdefault(key, context)
+    return out
 
 
 def bmi_from(height_cm: float | None, weight_kg: float | None) -> float | None:
@@ -141,8 +160,12 @@ def decide_apnea_tier(
     synthetic: bool = False,
     hypertension_from_conditions: bool = False,
     config: Mapping | None = None,
+    suppressed: Mapping[str, str] | None = None,
 ) -> ApneaDecision:
+    """`suppressed` maps a trend key (for example "spo2_pct") to the travel context that explains it
+    (for example "altitude 2500m"). Those trends are not counted as signals."""
     cfg = CONFIG if config is None else config
+    suppressed = suppressed or {}
     base_tier = stopbang.tier
     factors = stopbang_factors(stopbang, bmi, hypertension_from_conditions)
     fired: list[str] = []
@@ -191,6 +214,12 @@ def decide_apnea_tier(
             z = z_scores.get(key)
             if z is None:
                 unavailable.append(label)
+                continue
+            if key in suppressed:
+                if _trend_fired(z, direction, cfg["z_threshold"]):
+                    wearable_factors.append(
+                        f"{label} {cfg['recent_nights']}-night change of {z:+.1f} SD is not counted because of travel ({suppressed[key]})"
+                    )
                 continue
             evaluated += 1
             if _trend_fired(z, direction, cfg["z_threshold"]):
@@ -288,6 +317,7 @@ def screen_from_values(
     artifact: Mapping | None,
     synthetic: bool = False,
     config: Mapping | None = None,
+    suppressed: Mapping[str, str] | None = None,
 ) -> ApneaDecision:
     """One call from plain values to a decision; the schema wrapper only has to unpack its models."""
     bmi = bmi_from(height_cm, weight_kg)
@@ -317,4 +347,5 @@ def screen_from_values(
         synthetic=synthetic,
         hypertension_from_conditions=hypertension_from_conditions,
         config=config,
+        suppressed=suppressed,
     )

@@ -27,7 +27,7 @@ from app.models import ApneaScore, FeatureSet, NightRecord, ProfileInput
 
 from .features import baseline_zscores
 from .model import load_apnea_artifact
-from .scoring import CONFIG, screen_from_values
+from .scoring import CONFIG, screen_from_values, travel_suppressions
 
 RECENT_NIGHTS = 7
 MIN_BASELINE_NIGHTS = 7
@@ -142,6 +142,7 @@ def score_apnea(profile: ProfileInput, features: FeatureSet) -> ApneaScore:
         artifact=_artifact(),
         synthetic="synthetic_data" in features.data_quality_flags,
         config=CONFIG,
+        suppressed=travel_suppressions(features.data_quality_flags),
     )
     return ApneaScore(
         tier=d.tier,  # type: ignore[arg-type]

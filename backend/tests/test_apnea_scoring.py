@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # backend/, so `app` is importable
 
 from app.services.screening.model import load_apnea_artifact
-from app.services.screening.scoring import CONFIG, TIERS, bmi_from, screen_from_values
+from app.services.screening.scoring import CONFIG, TIERS, bmi_from, screen_from_values, travel_suppressions
 
 ART = load_apnea_artifact()
 BENIGN_VALUES = {"resting_heart_rate_bpm": 50.0, "hrv_rmssd_ms": 70.0}  # model score below cutoff
@@ -235,3 +235,31 @@ def test_one_breathing_signal_plus_one_other_still_raises():
 def test_the_breathing_requirement_is_in_the_config_and_the_evidence_note():
     assert CONFIG["breathing_signals"] == ("spo2_pct", "respiratory_rate_rpm")
     assert "at least one breathing signal (SpO2 or respiratory rate)" in run("Low").evidence_note
+
+
+def test_travel_flags_map_to_the_signals_they_explain():
+    assert travel_suppressions(["synthetic_data"]) == {}
+    alt = travel_suppressions(["travel:altitude:2500m"])
+    assert set(alt) == {"spo2_pct", "respiratory_rate_rpm"} and alt["spo2_pct"] == "altitude 2500m"
+    jet = travel_suppressions(["travel:jetlag:+8h", "synthetic_data"])
+    assert set(jet) == {"disturbance_count", "sleep_efficiency_pct"} and jet["sleep_efficiency_pct"] == "jetlag +8h"
+    assert set(travel_suppressions(["travel:altitude:2500m", "travel:jetlag:+8h"])) == set(alt) | set(jet)
+    assert travel_suppressions(["travel:inferred:flight", "travel:altitude"]) == {}  # unknown mode or no detail
+
+
+def test_an_altitude_trip_does_not_raise_the_apnea_tier():
+    z = {"spo2_pct": -8.0, "respiratory_rate_rpm": 2.6}
+    assert run("Low", z=z).tier == "Moderate"  # without the travel context it would raise
+    d = run("Low", z=z, suppressed=travel_suppressions(["travel:altitude:2500m"]))
+    assert d.tier == "Low" and not d.raised and d.signals_fired == []
+    assert any("SpO2" in f and "not counted because of travel (altitude 2500m)" in f for f in d.top_factors)
+    assert all(re.search(r"\d", f) for f in d.top_factors)
+
+
+def test_travel_only_explains_its_own_signals():
+    sup = travel_suppressions(["travel:altitude:2500m"])
+    d = run("Low", z={"spo2_pct": -8.0, "respiratory_rate_rpm": 2.6, "disturbance_count": 3.0, "sleep_efficiency_pct": -3.0}, suppressed=sup)
+    assert set(d.signals_fired) == {"disturbance_count", "sleep_efficiency_pct"} and d.tier == "Low"  # no breathing signal left
+    d2 = run("Low", z={"spo2_pct": -8.0, "disturbance_count": 3.0}, suppressed=travel_suppressions(["travel:jetlag:+8h"]))
+    # Jet lag explains the disturbance change but not the SpO2 drop, so exactly one signal is left.
+    assert d2.signals_fired == ["spo2_pct"] and d2.tier == "Low"
