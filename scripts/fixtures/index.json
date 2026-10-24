@@ -1,0 +1,40 @@
+{
+  "seed": 20261024,
+  "travel_flag_convention": {
+    "altitude": "travel:altitude:<meters>m",
+    "jetlag": "travel:jetlag:<signed_hours>h",
+    "carrier": "FeatureSet.data_quality_flags (NightRecord has no travel field)"
+  },
+  "personas": [
+    {
+      "persona_id": "SYN-NORMAL",
+      "nights": 7,
+      "travel_nights": 0
+    },
+    {
+      "persona_id": "SYN-APNEA",
+      "nights": 14,
+      "travel_nights": 0
+    },
+    {
+      "persona_id": "SYN-MENOPAUSE",
+      "nights": 14,
+      "travel_nights": 7
+    },
+    {
+      "persona_id": "SYN-CARDIO",
+      "nights": 10,
+      "travel_nights": 0
+    },
+    {
+      "persona_id": "SYN-ALTITUDE",
+      "nights": 14,
+      "travel_nights": 7
+    },
+    {
+      "persona_id": "SYN-JETLAG",
+      "nights": 14,
+      "travel_nights": 7
+    }
+  ]
+}

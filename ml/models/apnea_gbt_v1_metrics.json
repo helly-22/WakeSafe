@@ -1,0 +1,178 @@
+{
+  "model_version": "apnea-gbt-v1",
+  "primary_ucd_full_features": {
+    "features": [
+      "hr_mean_bpm",
+      "hr_min_bpm",
+      "hr_max_bpm",
+      "hr_std_bpm",
+      "hrv_rmssd_ms",
+      "hrv_sdnn_ms",
+      "spo2_mean_pct",
+      "spo2_min_pct",
+      "spo2_drop_pct",
+      "spo2_time_below90_frac",
+      "spo2_desat_count",
+      "resp_rate_rpm",
+      "resp_rate_std_rpm",
+      "flow_rms"
+    ],
+    "n_minutes": 1228,
+    "n_records": 3,
+    "n_apnea_minutes": 358,
+    "n_normal_minutes": 870,
+    "validation": "leave-one-record-out (every minute of a recording held out together)",
+    "cutoff": 0.5,
+    "cv_auroc": 0.724,
+    "cv_sensitivity": 0.52,
+    "cv_specificity": 0.772,
+    "train_auroc": 0.97,
+    "train_minus_cv_auroc_gap": 0.246,
+    "per_record_heldout": {
+      "ucddb/ucddb002": {
+        "n": 374,
+        "apnea": 103,
+        "sensitivity": 0.107,
+        "specificity": 0.989
+      },
+      "ucddb/ucddb003": {
+        "n": 441,
+        "apnea": 205,
+        "sensitivity": 0.663,
+        "specificity": 0.661
+      },
+      "ucddb/ucddb005": {
+        "n": 413,
+        "apnea": 50,
+        "sensitivity": 0.78,
+        "specificity": 0.683
+      }
+    }
+  },
+  "secondary_apnea_ecg_hr_only": {
+    "features": [
+      "hr_mean_bpm",
+      "hr_min_bpm",
+      "hr_max_bpm",
+      "hr_std_bpm",
+      "hrv_rmssd_ms",
+      "hrv_sdnn_ms"
+    ],
+    "n_minutes": 2992,
+    "n_records": 6,
+    "n_apnea_minutes": 2071,
+    "n_normal_minutes": 921,
+    "validation": "leave-one-record-out (every minute of a recording held out together)",
+    "cutoff": 0.5,
+    "cv_auroc": 0.705,
+    "cv_sensitivity": 0.657,
+    "cv_specificity": 0.739,
+    "train_auroc": 0.921,
+    "train_minus_cv_auroc_gap": 0.216,
+    "per_record_heldout": {
+      "apnea-ecg/a01": {
+        "n": 489,
+        "apnea": 470,
+        "sensitivity": 0.994,
+        "specificity": 0.0
+      },
+      "apnea-ecg/a02": {
+        "n": 528,
+        "apnea": 420,
+        "sensitivity": 0.007,
+        "specificity": 1.0
+      },
+      "apnea-ecg/a03": {
+        "n": 519,
+        "apnea": 246,
+        "sensitivity": 0.976,
+        "specificity": 0.535
+      },
+      "apnea-ecg/a04": {
+        "n": 492,
+        "apnea": 453,
+        "sensitivity": 0.821,
+        "specificity": 0.897
+      },
+      "apnea-ecg/a05": {
+        "n": 454,
+        "apnea": 276,
+        "sensitivity": 0.804,
+        "specificity": 0.708
+      },
+      "apnea-ecg/a06": {
+        "n": 510,
+        "apnea": 206,
+        "sensitivity": 0.277,
+        "specificity": 0.875
+      }
+    }
+  },
+  "permutation_importance": {
+    "spo2_drop_pct": 0.101,
+    "resp_rate_rpm": 0.028,
+    "flow_rms": 0.018,
+    "hr_std_bpm": 0.015,
+    "resp_rate_std_rpm": 0.012,
+    "hr_mean_bpm": 0.009,
+    "spo2_mean_pct": 0.007,
+    "hr_max_bpm": 0.006,
+    "hr_min_bpm": 0.005,
+    "spo2_time_below90_frac": 0.004,
+    "spo2_min_pct": 0.003,
+    "hrv_rmssd_ms": 0.0,
+    "hrv_sdnn_ms": 0.0,
+    "spo2_desat_count": 0.0
+  },
+  "runtime_features": [
+    "hr_mean_bpm",
+    "hr_min_bpm",
+    "hr_max_bpm",
+    "hr_std_bpm",
+    "hrv_rmssd_ms",
+    "hrv_sdnn_ms",
+    "spo2_mean_pct",
+    "spo2_min_pct",
+    "spo2_drop_pct",
+    "spo2_time_below90_frac",
+    "spo2_desat_count",
+    "resp_rate_rpm",
+    "resp_rate_std_rpm",
+    "flow_rms"
+  ],
+  "hr_features": [
+    "hr_mean_bpm",
+    "hr_min_bpm",
+    "hr_max_bpm",
+    "hr_std_bpm",
+    "hrv_rmssd_ms",
+    "hrv_sdnn_ms"
+  ],
+  "limitations": [
+    "Screening aid, not a diagnosis. WakeSafe flags a pattern worth discussing with a clinician; it never tells a user they have sleep apnea.",
+    "Trained on raw clinical polysomnography and ECG (UCD St Vincent's + PhysioNet Apnea-ECG), NOT on WHOOP nightly summaries. It validates the screening LOGIC on wearable-mappable signals; accuracy on real WHOOP data is not claimed and has not been measured. WHOOP computes SpO2, resting HR and HRV differently from these clinical sensors.",
+    "Very small sample: a few overnight recordings per cohort (the full Apnea-ECG database could not be fetched in this environment). Leave-one-record-out validation is honest but confidence intervals are wide and a single unusual night moves the numbers.",
+    "Per-minute labels within a night are correlated, so the effective sample size is far smaller than the minute count; held-out AUROC is reported per record so no single night hides in the pool.",
+    "The two cohorts carry different raw signals (UCD has SpO2; Apnea-ECG does not), so they are validated separately rather than pooled -- pooling on the shared HR/HRV signals alone was weaker and would hide the fact that SpO2 is the dominant apnea signal.",
+    "Output probability is NOT calibrated and must not be shown to a user as a percentage risk."
+  ],
+  "provenance": {
+    "apnea_ecg": [
+      "a01",
+      "a02",
+      "a03",
+      "a04",
+      "a05",
+      "a06",
+      "b01",
+      "b04",
+      "c01"
+    ],
+    "ucddb": [
+      "ucddb002",
+      "ucddb003",
+      "ucddb005"
+    ],
+    "ucddb_skipped": []
+  }
+}

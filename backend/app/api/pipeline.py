@@ -27,10 +27,26 @@ from app.services.screening.service import compute_features, score_apnea
 
 
 def run_screen(
-    profile: ProfileInput, nights: list[NightRecord]
+    profile: ProfileInput,
+    nights: list[NightRecord],
+    extra_quality_flags: list[str] | None = None,
 ) -> tuple[FeatureSet, ApneaScore, RiskAssessment]:
-    """features -> apnea score -> risk assessment, for a profile + nights."""
+    """features -> apnea score -> risk assessment, for a profile + nights.
+
+    ``extra_quality_flags`` are out-of-band flags (travel:* / cycle:* markers
+    carried in a fixture's ``travel_context`` sidecar, or travel inferred from a
+    location/speed series) that the frozen NightRecord/FeatureSet cannot hold as
+    fields. They are MERGED into ``features.data_quality_flags`` before the risk
+    engine runs, which is the convention the engine reads travel / cycle context
+    from. compute_features itself is Person A's and is not changed.
+    """
     features = compute_features(nights)
+    if extra_quality_flags:
+        merged = list(features.data_quality_flags or [])
+        for flag in extra_quality_flags:
+            if flag and flag not in merged:
+                merged.append(flag)
+        features = features.model_copy(update={"data_quality_flags": merged})
     apnea = score_apnea(profile, features)
     assessment = assess_risks(profile, features, apnea)
     return features, apnea, assessment

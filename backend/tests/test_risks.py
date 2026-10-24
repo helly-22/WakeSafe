@@ -230,12 +230,16 @@ def test_large_dip_persists_even_when_traveling():
 # ---- Menopause / perimenopause (6th group) ----------------------------------
 
 
-def test_menopause_fires_on_warm_disturbed_nights_without_apnea_signature():
-    # Sleep efficiency down + disturbances up, but NO SpO2 dip and NO raised
-    # respiratory rate -> the warm/disturbed pattern is attributed to menopause.
+def test_menopause_fires_on_warm_disturbed_nights_with_cycle_marker():
+    # Sleep efficiency down + disturbances up, NO SpO2 dip / NO raised RR, AND a
+    # cycle-disruption marker present -> the warm/disturbed pattern is attributed
+    # to menopause. (The marker is the signal the gate now requires.)
     a = assess_risks(
         make_profile(),
-        make_features(z={"sleep_efficiency_pct": -3.0, "disturbance_count": 3.5}),
+        make_features(
+            z={"sleep_efficiency_pct": -3.0, "disturbance_count": 3.5},
+            flags=["cycle:irregular"],
+        ),
         make_apnea("Low"),
     )
     meno = get_risk(a, "menopause")
@@ -245,13 +249,61 @@ def test_menopause_fires_on_warm_disturbed_nights_without_apnea_signature():
     assert a.urgent_override is False
 
 
+def test_menopause_does_not_fire_without_cycle_signal():
+    # The SAME warm/disturbed signals but NO cycle marker and NO reported
+    # peri/menopause condition -> non-specific, so menopause stays Low.
+    a = assess_risks(
+        make_profile(),
+        make_features(z={"sleep_efficiency_pct": -3.0, "disturbance_count": 3.5}),
+        make_apnea("Low"),
+    )
+    meno = get_risk(a, "menopause")
+    assert meno.tier == "Low", (meno.tier, meno.reasons)
+    assert any("cycle disruption" in r.lower() for r in meno.reasons)
+
+
+def test_menopause_never_fires_for_male_even_with_cycle_marker_and_signals():
+    # Male sex is an absolute gate: even with a cycle marker, reported conditions
+    # and warm/disturbed signals, the menopause group is EXCLUDED from the result
+    # entirely -- not scored, not listed, not a zeroed row (a "Menopause: Low"
+    # row would wrongly imply the question was askable for a male).
+    a = assess_risks(
+        ProfileInput(
+            sex="male",
+            conditions=["hot flashes", "irregular periods"],
+        ),
+        make_features(
+            z={"sleep_efficiency_pct": -3.0, "disturbance_count": 3.5},
+            flags=["cycle:irregular"],
+        ),
+        make_apnea("Low"),
+    )
+    assert "menopause" not in {r.risk_id for r in a.risks}, [r.risk_id for r in a.risks]
+
+
+def test_menopause_fires_for_unknown_sex_with_cycle_marker():
+    # Unknown / None sex must still be ALLOWED (demo fixtures carry a neutral
+    # all-None profile), so a cycle marker + signals still flags menopause.
+    a = assess_risks(
+        ProfileInput(sex=None),
+        make_features(
+            z={"sleep_efficiency_pct": -3.0, "disturbance_count": 3.5},
+            flags=["cycle:irregular"],
+        ),
+        make_apnea("Low"),
+    )
+    assert get_risk(a, "menopause").tier in ("Moderate", "High")
+
+
 def test_menopause_suppressed_when_signals_fit_apnea_breathing_pattern():
-    # The SAME disturbed-sleep signals, but now with an SpO2 dip -> the pattern
-    # better fits sleep-disordered breathing, so menopause does NOT fire.
+    # The SAME disturbed-sleep signals WITH a cycle marker (so the sex/cycle gate
+    # passes), but now with an SpO2 dip -> the pattern better fits sleep-
+    # disordered breathing, so menopause does NOT fire.
     a = assess_risks(
         make_profile(),
         make_features(
-            z={"sleep_efficiency_pct": -3.0, "disturbance_count": 3.5, "spo2_pct": -3.0}
+            z={"sleep_efficiency_pct": -3.0, "disturbance_count": 3.5, "spo2_pct": -3.0},
+            flags=["cycle:irregular"],
         ),
         make_apnea("Moderate"),
     )

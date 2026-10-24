@@ -8,6 +8,7 @@ frozen contract types themselves.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -43,9 +44,9 @@ class CareRequest(BaseModel):
     """Body for POST /care: a RiskAssessment plus the user's CURRENT location."""
 
     assessment: RiskAssessment
-    user_lat: float
-    user_lon: float
-    max_results: int = 5
+    user_lat: float = Field(ge=-90, le=90)
+    user_lon: float = Field(ge=-180, le=180)
+    max_results: int = Field(default=5, ge=1, le=20)
 
 
 class ExplainRequest(BaseModel):
@@ -90,3 +91,28 @@ class DemoResponse(BaseModel):
     care: CareRecommendations
     explanation: Explanation
     report: ClinicianReportData
+
+
+class NudgeItem(BaseModel):
+    """One calm, single-action public-health nudge.
+
+    Defined in the API layer because the frozen contract (schemas.py) has no
+    nudge type. No domain logic -- it mirrors ``app.services.nudges.Nudge``.
+    """
+
+    topic: Literal["respiratory", "flu", "mosquito"]
+    message: str
+    action: str
+    as_of: str = Field(description="ISO date the underlying data is current to")
+    source: Literal["live", "cached"]
+
+
+class NudgeResponse(BaseModel):
+    """What GET /nudges returns: a small set of calm nudges plus an honest
+    as-of stamp and a live/cached source flag."""
+
+    region: str
+    as_of: str
+    source: Literal["live", "cached"]
+    nudges: list[NudgeItem]
+    notes: list[str] = Field(default_factory=list)

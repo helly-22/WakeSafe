@@ -86,6 +86,10 @@ class Persona:
     nights: list[NightRecord]
     # sidecar: night_id -> list of data_quality_flags travel strings
     travel_context: dict[str, list[str]] = field(default_factory=dict)
+    # optional intake the demo should apply instead of an all-None profile
+    # (e.g. the menopause persona is female); kept as a plain dict so it stays
+    # within the frozen ProfileInput contract without importing it here.
+    profile: dict | None = None
 
 
 def _jitter(rng: random.Random, mean: float, spread: float) -> float:
@@ -192,14 +196,20 @@ def make_menopause(rng: random.Random, baseline_nights: int = 7, recent_nights: 
     near-normal baseline phase then a recent phase where those signals deviate,
     so (recent mean - baseline mean)/std clears the z threshold.
 
-    The generator cannot set profile.conditions (fixtures are nights-only); the
-    cycle-irregularity path ("irregular periods"/"hot flashes") is exercised by
-    the risk-engine unit tests via a profile, not here.
+    GATING (see rules.py): the menopause group now requires (a) a non-male sex
+    and (b) a marked menstrual-cycle disruption. So this persona declares a
+    FEMALE profile and carries a cycle-disruption marker in its travel_context
+    sidecar (``cycle:irregular``, the same out-of-band convention travel uses,
+    since NightRecord/FeatureSet have no cycle field and schemas.py is frozen).
+    The marker is attached to every recent night so it is present in the scored
+    window. Without both gates the warm/disturbed signals are non-specific and
+    the group stays Low.
     """
     pid = "SYN-MENOPAUSE"
     total = baseline_nights + recent_nights
     days = _days(total)
     recs: list[NightRecord] = []
+    cycle: dict[str, list[str]] = {}
     for d in days[:baseline_nights]:
         recs.append(_night(rng, pid, d))
     for d in days[baseline_nights:]:
@@ -208,8 +218,16 @@ def make_menopause(rng: random.Random, baseline_nights: int = 7, recent_nights: 
             "sleep_efficiency_pct": _jitter(rng, 83.0, 2.0),   # warm, broken nights
             "disturbance_count": rng.randint(11, 15),
         }
-        recs.append(_night(rng, pid, d, ov))
-    return Persona(pid, "Demo peri/menopause pattern", recs)
+        rec = _night(rng, pid, d, ov)
+        cycle[rec.night_id] = ["cycle:irregular"]  # marked cycle disruption
+        recs.append(rec)
+    return Persona(
+        pid,
+        "Demo peri/menopause pattern",
+        recs,
+        cycle,
+        profile={"sex": "female"},
+    )
 
 
 def make_cardiovascular(rng: random.Random, nights: int = 10) -> Persona:
@@ -227,49 +245,63 @@ def make_cardiovascular(rng: random.Random, nights: int = 10) -> Persona:
     return Persona(pid, "Demo cardiovascular drift", recs)
 
 
-def make_altitude(rng: random.Random, nights: int = 5) -> Persona:
-    """Altitude trip: SpO2 lower than usual on travel nights, but it is a travel
-    FALSE ALARM. Sidecar marks those nights travel:altitude so the risk engine
-    suppresses the SpO2 signal. Night 0 is a pre-trip home baseline."""
+def make_altitude(rng: random.Random, baseline_nights: int = 7, travel_nights: int = 7) -> Persona:
+    """Altitude trip: SpO2 lower than usual on the recent (travel) nights, but it
+    is a travel FALSE ALARM.
+
+    Built as ``baseline_nights`` of home nights (the person's own reference) then
+    ``travel_nights`` at altitude -- enough nights (>=7 + >=7) that the feature
+    engine emits z-scores, so the recent SpO2 dip reads as a real deviation. The
+    recent nights carry a ``travel:altitude`` sidecar flag, so the risk engine
+    (1) relaxes the SpO2/RR threshold and (2) treats the window as TRACK-ONLY:
+    the nights are kept, but no care recommendation is ranked solely on the trip.
+    """
     pid = "SYN-ALTITUDE"
+    days = _days(baseline_nights + travel_nights)
     recs: list[NightRecord] = []
     travel: dict[str, list[str]] = {}
     elevation_m = 2500
-    for i, d in enumerate(_days(nights)):
-        rec = _night(rng, pid, d)
-        if i >= 1:  # nights 1..n are at altitude
-            rec = _night(
-                rng, pid, d,
-                {
-                    "spo2_pct": _jitter(rng, 90.5, 0.8),             # low, looks apnea-like
-                    "respiratory_rate_rpm": _jitter(rng, 15.6, 0.3),  # mildly up at altitude
-                },
-            )
-            travel[rec.night_id] = [f"travel:altitude:{elevation_m}m"]
+    for d in days[:baseline_nights]:  # home baseline
+        recs.append(_night(rng, pid, d))
+    for d in days[baseline_nights:]:  # at altitude
+        rec = _night(
+            rng, pid, d,
+            {
+                "spo2_pct": _jitter(rng, 90.5, 0.8),             # low, looks apnea-like
+                "respiratory_rate_rpm": _jitter(rng, 15.6, 0.3),  # mildly up at altitude
+            },
+        )
+        travel[rec.night_id] = [f"travel:altitude:{elevation_m}m"]
         recs.append(rec)
     return Persona(pid, "Demo altitude trip (SpO2 suppressed)", recs, travel)
 
 
-def make_jetlag(rng: random.Random, nights: int = 5) -> Persona:
-    """Jet-lag trip: disrupted sleep timing/efficiency that looks like a flag but
-    is travel-explained (+8h tz shift). Sidecar marks the nights travel:jetlag."""
+def make_jetlag(rng: random.Random, baseline_nights: int = 7, travel_nights: int = 7) -> Persona:
+    """Jet-lag trip: disrupted sleep timing/efficiency on the recent nights that
+    looks like a flag but is travel-explained (+8h tz shift).
+
+    Built as ``baseline_nights`` home nights then ``travel_nights`` after the
+    long-haul flight (>=7 + >=7 so z-scores exist). The recent nights carry a
+    ``travel:jetlag`` sidecar flag, so the engine relaxes the timing thresholds
+    and treats the window as TRACK-ONLY (kept, but no care ranked on it alone)."""
     pid = "SYN-JETLAG"
+    days = _days(baseline_nights + travel_nights)
     recs: list[NightRecord] = []
     travel: dict[str, list[str]] = {}
     tz_shift = "+8h"
-    for i, d in enumerate(_days(nights)):
-        rec = _night(rng, pid, d)
-        if i >= 1:  # nights 1..n after the long-haul flight
-            rec = _night(
-                rng, pid, d,
-                {
-                    "sleep_efficiency_pct": _jitter(rng, 73.0, 3.0),     # poor efficiency
-                    "sleep_consistency_pct": _jitter(rng, 42.0, 5.0),    # wrecked timing
-                    "disturbance_count": rng.randint(18, 28),
-                    "sleep_duration_minutes": _jitter(rng, 360.0, 25.0),
-                },
-            )
-            travel[rec.night_id] = [f"travel:jetlag:{tz_shift}"]
+    for d in days[:baseline_nights]:  # home baseline
+        recs.append(_night(rng, pid, d))
+    for d in days[baseline_nights:]:  # after the long-haul flight
+        rec = _night(
+            rng, pid, d,
+            {
+                "sleep_efficiency_pct": _jitter(rng, 73.0, 3.0),     # poor efficiency
+                "sleep_consistency_pct": _jitter(rng, 42.0, 5.0),    # wrecked timing
+                "disturbance_count": rng.randint(18, 28),
+                "sleep_duration_minutes": _jitter(rng, 360.0, 25.0),
+            },
+        )
+        travel[rec.night_id] = [f"travel:jetlag:{tz_shift}"]
         recs.append(rec)
     return Persona(pid, "Demo jet-lag trip (timing suppressed)", recs, travel)
 
@@ -290,16 +322,20 @@ def build_all(seed: int = SEED) -> list[Persona]:
 
 def persona_to_doc(p: Persona) -> dict:
     """Serialise a persona to a plain dict that reloads cleanly as NightRecords."""
-    return {
+    doc = {
         "persona_id": p.persona_id,
         "display_name": p.display_name,
         # nights are pure NightRecord dicts (JSON-mode so date serialises to str)
         "nights": [n.model_dump(mode="json") for n in p.nights],
-        # out-of-band travel context, keyed by night_id (see module docstring)
+        # out-of-band travel / cycle context, keyed by night_id (see docstring)
         "travel_context": [
             {"night_id": nid, "flags": flags} for nid, flags in p.travel_context.items()
         ],
     }
+    if p.profile:
+        # Optional intake the demo applies instead of an all-None profile.
+        doc["profile"] = dict(p.profile)
+    return doc
 
 
 def write_fixtures(out_dir: Path = OUT_DIR, seed: int = SEED) -> list[Path]:
