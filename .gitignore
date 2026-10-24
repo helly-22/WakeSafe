@@ -51,3 +51,8 @@ pnpm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# Person A additions
+data/raw/
+data/processed/
+models/*.joblib

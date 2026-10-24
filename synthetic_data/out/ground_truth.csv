@@ -1,0 +1,67 @@
+# SYNTHETIC DATA. Not clinical. Do not use to estimate model accuracy. file=ground_truth.csv generator=synthetic_data/generate_synthetic_whoop.py seed=42 nights=30 n_healthy=25 n_osa=20 n_hard_negative=6 n_hard_positive=6 n_other=8 config_sha256=2da7809a6dcd
+person_id,true_condition,simulated_ahi,difficulty,notes,is_synthetic
+P001,osa_severe,48.4,easy,"pattern consistent with severe sleep apnea, effect scale 0.51",True
+P002,healthy,,easy,healthy-style baseline,True
+P003,osa_mild,11.4,easy,"pattern consistent with mild sleep apnea, effect scale 0.61",True
+P004,osa_severe,31.8,easy,"pattern consistent with severe sleep apnea, effect scale 0.69",True
+P005,healthy,,easy,healthy-style baseline,True
+P006,respiratory_flare,,easy,asthma flare pattern on nights 2026-09-06 to 2026-09-09,True
+P007,healthy,,easy,healthy-style baseline,True
+P008,healthy,,easy,healthy-style baseline,True
+P009,acute_illness,,easy,"acute illness pattern on nights 2026-09-15 to 2026-09-18, then recovery",True
+P010,osa_mild,8.0,easy,"pattern consistent with mild sleep apnea, effect scale 0.75",True
+P011,osa_mild,6.1,easy,"pattern consistent with mild sleep apnea, effect scale 0.94",True
+P012,urgent,,easy,"user-reported red flag: severe_shortness_of_breath; underlying wearable pattern: acute illness pattern on nights 2026-09-20 to 2026-09-23, then recovery",True
+P013,osa_severe,55.6,easy,"pattern consistent with severe sleep apnea, effect scale 1.23",True
+P014,healthy,,easy,healthy-style baseline,True
+P015,healthy,,easy,healthy-style baseline,True
+P016,healthy,,hard,healthy short sleeper; short time in bed and mild sleep debt,True
+P017,osa_mild,5.1,hard,"subtle pattern consistent with mild sleep apnea, effect scale 0.50; healthy BMI range; no reported snoring",True
+P018,osa_severe,59.6,easy,"pattern consistent with severe sleep apnea, effect scale 0.83",True
+P019,osa_moderate,18.3,easy,"pattern consistent with moderate sleep apnea, effect scale 1.26",True
+P020,osa_severe,45.3,easy,"pattern consistent with severe sleep apnea, effect scale 1.01",True
+P021,osa_mild,7.5,hard,"subtle pattern consistent with mild sleep apnea, effect scale 0.29; healthy BMI range; no reported snoring",True
+P022,osa_moderate,18.2,easy,"pattern consistent with moderate sleep apnea, effect scale 1.00",True
+P023,cardiovascular_strain,,easy,resting HR drifts up and HRV drifts down over the last 21 nights (2026-09-10 to 2026-09-30),True
+P024,osa_mild,8.8,hard,"subtle pattern consistent with mild sleep apnea, effect scale 0.36; healthy BMI range; no reported snoring",True
+P025,respiratory_flare,,easy,asthma flare pattern on nights 2026-09-14 to 2026-09-17,True
+P026,cardiovascular_strain,,easy,resting HR drifts up and HRV drifts down over the last 15 nights (2026-09-16 to 2026-09-30),True
+P027,healthy,,easy,healthy-style baseline,True
+P028,healthy,,easy,healthy-style baseline,True
+P029,healthy,,hard,healthy with a common cold on nights 2026-09-13 to 2026-09-16,True
+P030,osa_mild,13.4,easy,"pattern consistent with mild sleep apnea, effect scale 1.43",True
+P031,osa_moderate,28.6,easy,"pattern consistent with moderate sleep apnea, effect scale 1.11",True
+P032,osa_severe,36.8,easy,"pattern consistent with severe sleep apnea, effect scale 0.68",True
+P033,healthy,,easy,healthy-style baseline,True
+P034,healthy,,easy,healthy-style baseline,True
+P035,osa_mild,13.9,easy,"pattern consistent with mild sleep apnea, effect scale 1.23",True
+P036,healthy,,easy,healthy-style baseline,True
+P037,osa_moderate,16.5,easy,"pattern consistent with moderate sleep apnea, effect scale 1.45",True
+P038,healthy,,easy,healthy-style baseline,True
+P039,healthy,,easy,healthy-style baseline,True
+P040,osa_mild,10.4,hard,"subtle pattern consistent with mild sleep apnea, effect scale 0.20; healthy BMI range; no reported snoring",True
+P041,osa_mild,7.1,easy,"pattern consistent with mild sleep apnea, effect scale 1.00",True
+P042,healthy,,hard,healthy with higher BMI and no apnea pattern,True
+P043,osa_mild,7.0,hard,"subtle pattern consistent with mild sleep apnea, effect scale 0.49; healthy BMI range; no reported snoring",True
+P044,healthy,,easy,healthy-style baseline,True
+P045,osa_moderate,18.4,easy,"pattern consistent with moderate sleep apnea, effect scale 0.90",True
+P046,healthy,,easy,healthy-style baseline,True
+P047,healthy,,easy,healthy-style baseline,True
+P048,healthy,,easy,healthy-style baseline,True
+P049,healthy,,easy,healthy-style baseline,True
+P050,healthy,,easy,healthy-style baseline,True
+P051,healthy,,easy,healthy-style baseline,True
+P052,healthy,,hard,healthy with frequent alcohol nights,True
+P053,healthy,,easy,healthy-style baseline,True
+P054,healthy,,easy,healthy-style baseline,True
+P055,osa_mild,6.9,easy,"pattern consistent with mild sleep apnea, effect scale 1.33",True
+P056,osa_moderate,24.2,easy,"pattern consistent with moderate sleep apnea, effect scale 1.39",True
+P057,healthy,,easy,healthy-style baseline,True
+P058,healthy,,hard,healthy short sleeper; short time in bed and mild sleep debt,True
+P059,healthy,,easy,healthy-style baseline,True
+P060,healthy,,hard,healthy endurance trainer; hard training nights raise resting HR and lower HRV,True
+P061,osa_mild,10.8,hard,"subtle pattern consistent with mild sleep apnea, effect scale 0.46; healthy BMI range; no reported snoring",True
+P062,osa_moderate,23.0,easy,"pattern consistent with moderate sleep apnea, effect scale 1.03",True
+P063,acute_illness,,easy,"acute illness pattern on nights 2026-09-06 to 2026-09-08, then recovery",True
+P064,urgent,,easy,user-reported red flag: stroke_symptoms; underlying wearable pattern: healthy-style baseline,True
+P065,healthy,,easy,healthy-style baseline,True
