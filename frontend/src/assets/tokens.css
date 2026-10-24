@@ -1,0 +1,100 @@
+/* WakeSafe design tokens. The single source for color, type, space, radius,
+   chart and motion values. Components reference these; they do not hard-code. */
+
+:root {
+  /* ---- Surfaces: near-black canvas, tonal layers instead of heavy borders ---- */
+  --bg: #07090b;
+  --surface-1: #0e1215; /* panels */
+  --surface-2: #151b1f; /* inset areas, hover */
+  --surface-3: #1d252a; /* controls, active */
+  --line: rgba(255, 255, 255, 0.06); /* hairline dividers */
+  --line-strong: rgba(255, 255, 255, 0.13);
+
+  /* ---- Text ---- */
+  --text: #f4f6f8;
+  --text-2: #b6bfc8;
+  --muted: #8b95a0; /* >= 5:1 on --surface-1 */
+
+  /* ---- Accents (restrained) ---- */
+  --teal: #1fc7b4;
+  --cyan: #45c9f0;
+  --green: #5ccf86;
+  --amber: #e9b44c;
+  --coral: #f2795d;
+  --urgent: #ff5656;
+  --urgent-bg: #2a1214;
+
+  /* ---- Data roles ---- */
+  --c-efficiency: var(--teal);
+  --c-deep: #2f86c4;
+  --c-rem: var(--cyan);
+  --c-other: #36424b;
+  --c-hr: var(--coral);
+  --c-hrv: var(--green);
+  --c-resp: var(--cyan);
+  --c-spo2: var(--teal);
+  --c-temp: var(--amber);
+  --c-duration: var(--teal);
+
+  /* ---- Provenance (dot + label, never a box) ---- */
+  --src-patient: #b9a8ff;
+  --src-wearable: var(--cyan);
+  --src-calculated: var(--green);
+  --src-model: var(--amber);
+  --src-simulated: #f1cf7a;
+
+  /* ---- Screening tiers ---- */
+  --tier-low: var(--green);
+  --tier-moderate: var(--amber);
+  --tier-high: var(--coral);
+
+  /* ---- Type ---- */
+  --font: ui-sans-serif, -apple-system, 'SF Pro Display', 'SF Pro Text', system-ui, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  --fs-eyebrow: 0.68rem;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.84rem;
+  --fs-md: 0.94rem;
+  --fs-lg: 1.1rem;
+  --fs-xl: 1.5rem;
+  --fs-num-md: 1.9rem;
+  --fs-num-lg: 3.1rem;
+  --fs-display: clamp(2.8rem, 4.2vw, 3.8rem);
+  --fw-regular: 450;
+  --fw-medium: 560;
+  --fw-bold: 680;
+  --tracking-eyebrow: 0.1em;
+
+  /* ---- Space (4px scale) ---- */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --gap: 16px;
+
+  /* ---- Shape ---- */
+  --r-panel: 20px;
+  --r-md: 12px;
+  --r-sm: 8px;
+
+  /* ---- Layout ---- */
+  --sidebar-w: 224px;
+  --content-max: 1360px;
+
+  /* ---- Chart ---- */
+  --chart-stroke: 2px;
+  --chart-grid: rgba(255, 255, 255, 0.07);
+  --chart-axis: var(--muted);
+  --chart-missing: rgba(255, 255, 255, 0.045);
+
+  /* ---- Motion ---- */
+  --dur-fast: 120ms;
+  --dur: 220ms;
+  --dur-slow: 800ms;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  color-scheme: dark;
+}
