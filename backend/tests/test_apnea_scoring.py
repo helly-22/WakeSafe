@@ -10,13 +10,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # backend/, so `app` is importable
 
 from app.services.screening.model import load_apnea_artifact
-from app.services.screening.scoring import (
-    MIN_SIGNALS_TO_RAISE,
-    TIERS,
-    Z_THRESHOLD,
-    bmi_from,
-    screen_from_values,
-)
+from app.services.screening.scoring import CONFIG, TIERS, bmi_from, screen_from_values
 
 ART = load_apnea_artifact()
 BENIGN_VALUES = {"resting_heart_rate_bpm": 50.0, "hrv_rmssd_ms": 70.0}  # model score below cutoff
@@ -31,7 +25,11 @@ BASE_ANSWERS = {
 }
 
 
+MODEL_COUNTS = {**CONFIG, "model_counts_toward_raise": True}
+
+
 def run(base="Low", values=None, z=None, nights=14, spo2_nights=14, synthetic=False, **overrides):
+    overrides.setdefault("conditions", ())
     args = dict(
         male=False,
         height_cm=None,
@@ -72,8 +70,15 @@ def test_one_signal_alone_does_not_raise():
     assert any("needed to raise" in f for f in d.top_factors)
 
 
-def test_model_alone_does_not_raise():
-    d = run("Moderate", values=RISKY_VALUES)
+def test_model_is_a_supporting_factor_by_default():
+    assert CONFIG["model_counts_toward_raise"] is False
+    d = run("Moderate", values=RISKY_VALUES, z={"spo2_pct": -3.0})
+    assert d.model_score > CONFIG["model_cutoff"] and d.signals_fired == ["spo2_pct"] and d.tier == "Moderate"
+    assert any("supporting information only" in f for f in d.top_factors)
+
+
+def test_model_alone_does_not_raise_even_when_counted():
+    d = run("Moderate", values=RISKY_VALUES, config=MODEL_COUNTS)
     assert d.signals_fired == ["model"] and d.tier == "Moderate"
 
 
@@ -86,38 +91,49 @@ def test_two_signals_raise_one_level_with_reasons_and_numbers():
     assert d.top_factors[0] == step
 
 
-def test_model_plus_one_trend_raises_moderate_to_high():
-    d = run("Moderate", values=RISKY_VALUES, z={"disturbance_count": 2.5})
+def test_model_plus_one_trend_raises_moderate_to_high_when_counted():
+    d = run("Moderate", values=RISKY_VALUES, z={"disturbance_count": 2.5}, config=MODEL_COUNTS)
     assert d.tier == "High" and d.raised
     assert set(d.signals_fired) == {"model", "disturbance_count"}
 
 
 def test_all_signals_raise_only_one_level():
     z = {"spo2_pct": -4.0, "respiratory_rate_rpm": 4.0, "disturbance_count": 4.0, "sleep_efficiency_pct": -4.0}
-    d = run("Low", values=RISKY_VALUES, z=z)
+    d = run("Low", values=RISKY_VALUES, z=z, config=MODEL_COUNTS)
     assert len(d.signals_fired) == 5 and d.tier == "Moderate"
+    assert len(run("Low", values=RISKY_VALUES, z=z).signals_fired) == 4
 
 
 def test_high_stays_high_and_says_so():
-    d = run("High", values=RISKY_VALUES, z={"spo2_pct": -3.0})
+    d = run("High", values=RISKY_VALUES, z={"spo2_pct": -3.0, "respiratory_rate_rpm": 3.0})
     assert d.tier == "High" and not d.raised
     assert any("already High" in f for f in d.top_factors)
 
 
 def test_z_threshold_boundary_and_direction():
-    assert run("Low", z={"spo2_pct": -Z_THRESHOLD, "respiratory_rate_rpm": Z_THRESHOLD}).tier == "Moderate"
-    assert run("Low", z={"spo2_pct": -(Z_THRESHOLD - 0.01), "respiratory_rate_rpm": Z_THRESHOLD - 0.01}).tier == "Low"
+    zt = CONFIG["z_threshold"]
+    assert zt == 1.0
+    assert run("Low", z={"spo2_pct": -zt, "respiratory_rate_rpm": zt}).tier == "Moderate"
+    assert run("Low", z={"spo2_pct": -(zt - 0.01), "respiratory_rate_rpm": zt - 0.01}).tier == "Low"
     # wrong direction does not count
     assert run("Low", z={"spo2_pct": 5.0, "respiratory_rate_rpm": -5.0}).signals_fired == []
-    assert MIN_SIGNALS_TO_RAISE == 2
+    assert CONFIG["min_signals_to_raise"] == 2
 
 
 def test_missing_wearable_data_uses_questionnaire_only():
-    d = run("Moderate", values={}, z={k: None for k in CALM}, nights=3, spo2_nights=0)
+    d = run("Moderate", values={}, z={k: None for k in CALM}, nights=14, spo2_nights=0)
     assert d.tier == "Moderate" and d.model_score is None and d.signals_fired == []
     assert "questionnaire only" in d.evidence_note
-    assert any("3 available" in f or "3 nights" in f for f in d.top_factors)
     assert any("SpO2 recorded on 0" in f for f in d.top_factors)
+
+
+def test_fewer_than_minimum_nights_ignores_wearable_data():
+    risky_z = {"spo2_pct": -3.0, "respiratory_rate_rpm": 3.0}
+    d = run("Low", values=RISKY_VALUES, z=risky_z, nights=CONFIG["min_nights"] - 1)
+    assert d.tier == "Low" and d.signals_fired == [] and d.model_score is None
+    assert any("Only 6 nights" in f and "at least 7" in f for f in d.top_factors)
+    assert "questionnaire only" in d.evidence_note
+    assert run("Low", values=RISKY_VALUES, z=risky_z, nights=CONFIG["min_nights"]).tier == "Moderate"
 
 
 def test_unknown_answers_count_as_no_and_are_listed():
@@ -161,4 +177,42 @@ def test_synthetic_label_and_versions():
     d = run("Low", synthetic=True)
     assert "Synthetic demonstration data" in d.evidence_note
     assert d.model_version.startswith("apnea-hr-rmssd-v1+") and "rules" in d.model_version
-    assert "WHOOP" in d.evidence_note and "not claimed" in d.evidence_note
+
+
+def test_evidence_note_prints_thresholds_and_states_the_limits():
+    note = run("Low").evidence_note
+    assert "unreviewed by a clinician" in note
+    assert "trained on clinical ECG data" in note and "not been validated on WHOOP data" in note
+    assert f"{CONFIG['z_threshold']:g} SD" in note and f"{CONFIG['model_cutoff']:g}" in note
+    assert f"{CONFIG['min_signals_to_raise']} signals" in note and f"{CONFIG['min_nights']} nights" in note
+
+
+def test_config_cutoff_matches_the_trained_artifact():
+    assert CONFIG["model_cutoff"] == ART["cutoff"] == 0.5
+    assert CONFIG["min_nights"] == 7 and CONFIG["recent_nights"] == 7
+
+
+def test_trend_factors_describe_a_recent_change_not_a_condition():
+    z = {"spo2_pct": -1.3, "respiratory_rate_rpm": 1.4, "disturbance_count": 1.2, "sleep_efficiency_pct": -1.1}
+    d = run("Low", z=z)
+    trend = [f for f in d.top_factors if "-night average" in f]
+    assert len(trend) == 4
+    assert "SpO2 7-night average is 1.3 SD below your earlier nights" in trend
+    assert "Respiratory rate 7-night average is 1.4 SD above your earlier nights" in trend
+    banned = r"diagnos|apnea|apnoea|chronic|condition|disease|disorder|syndrome|sleep-disordered|you have|\bhas\b|suffer"
+    for f in trend:
+        assert not re.search(banned, f, re.I), f
+        assert re.search(r"\d", f)
+
+
+def test_hypertension_in_conditions_counts_and_is_listed():
+    d = run("Low", hypertension=None, conditions=["Asthma", "HyperTension"])
+    assert d.stop_bang_score == 1
+    assert any("high blood pressure (counted from the reported conditions)" in f for f in d.top_factors)
+    # explicit False is overridden by the conditions list, as specified
+    assert run("Low", hypertension=False, conditions=["hypertension"]).stop_bang_score == 1
+    # no double counting, and no "from conditions" note when the flag is already true
+    d2 = run("Low", hypertension=True, conditions=["hypertension"])
+    assert d2.stop_bang_score == 1 and not any("counted from the reported conditions" in f for f in d2.top_factors)
+    # unrelated conditions change nothing
+    assert run("Low", hypertension=None, conditions=["asthma"]).stop_bang_score == 0
