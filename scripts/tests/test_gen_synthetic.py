@@ -40,11 +40,12 @@ def test_every_record_is_a_valid_nightrecord(personas):
     assert total > 0
 
 
-def test_set_covers_all_five_cohorts(personas):
+def test_set_covers_all_cohorts(personas):
     ids = {p.persona_id for p in personas}
     assert ids == {
         "SYN-NORMAL",
         "SYN-APNEA",
+        "SYN-MENOPAUSE",
         "SYN-CARDIO",
         "SYN-ALTITUDE",
         "SYN-JETLAG",
@@ -63,16 +64,55 @@ def test_normal_is_near_baseline(personas):
     assert p.travel_context == {}
 
 
-def test_apnea_shows_demonstrable_frequency(personas):
+def test_apnea_has_baseline_then_deviating_recent_window(personas):
+    # The apnea persona is built as a near-normal baseline phase followed by a
+    # recent apnea phase, so compute_features has earlier nights to compare the
+    # recent window against (that is WHY the old 7-night persona produced empty
+    # z-scores and never flagged).
     p = _by_id(personas, "SYN-APNEA")
-    # "N of 7 nights" must be demonstrable: several nights desaturate.
-    desat = [n for n in p.nights if n.spo2_pct is not None and n.spo2_pct < 92]
-    assert len(p.nights) == 7
-    assert len(desat) >= 3  # 4 of 7 by construction
-    # those nights also run high RR and many disturbances
-    for n in desat:
-        assert n.respiratory_rate_rpm is not None and n.respiratory_rate_rpm > 16
-        assert n.disturbance_count is not None and n.disturbance_count > 15
+    assert len(p.nights) >= 14  # >=7 baseline + >=7 recent
+    assert p.travel_context == {}
+    # The recent window desaturates, runs an elevated RR and fragmented sleep.
+    recent = p.nights[7:]
+    desat = [n for n in recent if n.spo2_pct is not None and n.spo2_pct < 95]
+    assert len(desat) >= 3
+    for n in recent:
+        assert n.respiratory_rate_rpm is not None and n.respiratory_rate_rpm > 15.5
+        assert n.disturbance_count is not None and n.disturbance_count > 10
+    # Earlier baseline nights are near-normal (no desaturation).
+    baseline = p.nights[:7]
+    assert all(n.spo2_pct is not None and n.spo2_pct >= 95 for n in baseline)
+
+
+def test_apnea_produces_nonempty_sizeable_z_scores(personas):
+    # End-to-end proof of the BUG-1 fix: run the real feature engine and confirm
+    # the deviating signals yield non-None, sizeable z-scores.
+    import sys as _sys
+    from pathlib import Path as _P
+
+    _backend = _P(__file__).resolve().parents[2] / "backend"
+    if str(_backend) not in _sys.path:
+        _sys.path.insert(0, str(_backend))
+    from app.services.screening.service import compute_features  # noqa: E402
+
+    p = _by_id(personas, "SYN-APNEA")
+    f = compute_features(p.nights)
+    z = f.baseline_z_scores
+    assert z.get("spo2_pct") is not None and z["spo2_pct"] < -1.0
+    assert z.get("respiratory_rate_rpm") is not None and z["respiratory_rate_rpm"] > 1.0
+    assert z.get("disturbance_count") is not None and z["disturbance_count"] > 1.0
+
+
+def test_menopause_baseline_then_warm_disturbed_recent(personas):
+    p = _by_id(personas, "SYN-MENOPAUSE")
+    assert len(p.nights) >= 14
+    assert p.travel_context == {}
+    recent = p.nights[7:]
+    # Warm/disturbed recent nights: skin temp up, efficiency down, no SpO2 dip.
+    for n in recent:
+        assert n.skin_temperature_c is not None and n.skin_temperature_c > 34.0
+        assert n.sleep_efficiency_pct is not None and n.sleep_efficiency_pct < 88
+        assert n.spo2_pct is not None and n.spo2_pct >= 95  # NOT an apnea desaturation
 
 
 def test_cardiovascular_drift_direction(personas):
@@ -117,7 +157,7 @@ def test_fixtures_write_and_roundtrip_through_contract(tmp_path):
     paths = gs.write_fixtures(tmp_path)
     assert paths, "write_fixtures produced no files"
     json_files = [p for p in paths if p.suffix == ".json" and p.name != "index.json"]
-    assert len(json_files) == 5
+    assert len(json_files) == 6
     for path in json_files:
         nights, travel = gs.load_persona(path)
         assert nights

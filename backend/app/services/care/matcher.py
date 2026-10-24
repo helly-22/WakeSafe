@@ -233,6 +233,76 @@ def _parse_specialties(value) -> list[str]:
     return [s.strip().lower() for s in text.split(sep) if s.strip()]
 
 
+# --------------------------------------------------------------------------- #
+# Unit-flag -> care-specialty mapping
+# --------------------------------------------------------------------------- #
+#
+# The real hospitals.csv lists hospital UNIT flags (emergency, icu, ccu_cardiac,
+# stroke, trauma, med_surg, ...), NOT outpatient care specialties like "sleep
+# medicine". To route an apnea/pulmonary case to a plausible facility without
+# fabricating a dedicated sleep clinic, we DERIVE care specialties from the unit
+# flags a facility actually reports, and tag them inferred so the "why" note is
+# honest ("pulmonology/sleep inferred from med/surg + ICU capability").
+#
+# Each rule: a unit flag present -> the care specialties it plausibly supports.
+_UNIT_TO_SPECIALTY: dict[str, tuple[str, ...]] = {
+    "ccu_cardiac": ("cardiology",),
+    "stroke": ("cardiology",),
+    "icu": ("pulmonology", "sleep medicine"),
+    "med_surg": ("pulmonology", "sleep medicine", "primary care"),
+    "maternity": ("gynecology",),
+    "nicu": ("gynecology",),
+    "psychiatric": ("psychiatry",),
+    "rehabilitation": ("primary care",),
+    "pediatric": ("primary care",),
+}
+
+# Specialties that are genuine CARE specialties already (not unit flags). When a
+# facility lists one of these directly it is a reported capability, not inferred.
+_DIRECT_CARE_SPECIALTIES = {
+    "sleep medicine",
+    "pulmonology",
+    "cardiology",
+    "endocrinology",
+    "gynecology",
+    "primary care",
+    "psychiatry",
+}
+
+
+def enrich_specialties(raw_specialties: list[str]) -> tuple[list[str], list[str]]:
+    """Return (all_specialties, inferred_specialties) for a facility.
+
+    ``all_specialties`` keeps every raw flag (so Urgent still sees "emergency")
+    and adds any care specialties derived from unit flags. ``inferred`` lists the
+    care specialties that came ONLY from a unit-flag derivation (not reported
+    directly), so the caller can say so in the note instead of fabricating a
+    capability. Nothing is invented: a derived specialty is only added when a
+    supporting unit flag is actually present.
+    """
+    out = list(raw_specialties)
+    inferred: list[str] = []
+    for flag in raw_specialties:
+        for derived in _UNIT_TO_SPECIALTY.get(flag, ()):  # noqa: B007
+            if derived not in out:
+                out.append(derived)
+                if derived not in raw_specialties:
+                    inferred.append(derived)
+    return out, inferred
+
+
+def _lat_lon(fac: dict) -> tuple[float | None, float | None]:
+    """Read latitude/longitude, tolerating both the inline-fixture column names
+    (latitude/longitude) and the real hospitals.csv names (lat/lon)."""
+    lat = _float_or_none(fac.get("latitude"))
+    if lat is None:
+        lat = _float_or_none(fac.get("lat"))
+    lon = _float_or_none(fac.get("longitude"))
+    if lon is None:
+        lon = _float_or_none(fac.get("lon"))
+    return lat, lon
+
+
 def _float_or_none(value):
     try:
         return float(value)
@@ -298,9 +368,9 @@ def recommend_care(
 
     recs: list[FacilityRecommendation] = []
     for fac in raw_facilities:
-        lat = _float_or_none(fac.get("latitude"))
-        lon = _float_or_none(fac.get("longitude"))
-        specialties = _parse_specialties(fac.get("specialties"))
+        lat, lon = _lat_lon(fac)
+        raw_specialties = _parse_specialties(fac.get("specialties"))
+        specialties, inferred = enrich_specialties(raw_specialties)
         has_ed = _parse_bool(fac.get("has_ed")) or "emergency" in specialties
 
         if lat is not None and lon is not None:
@@ -326,6 +396,14 @@ def recommend_care(
             why = (
                 f"Covers {', '.join(matched)}" if matched else "General / primary care option"
             )
+            # Be honest when a matched specialty was inferred from unit flags
+            # (the facility does not list a dedicated clinic for it).
+            inferred_matched = [s for s in matched if s in inferred]
+            if inferred_matched:
+                why += (
+                    f" ({', '.join(inferred_matched)} inferred from the hospital's"
+                    " units, not a listed clinic)"
+                )
         if drive_minutes is not None:
             why += f"; ~{drive_minutes:.0f} min drive"
 
