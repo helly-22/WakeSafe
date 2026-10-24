@@ -88,7 +88,7 @@ def test_unknown_persona_and_unknown_source_give_clear_errors():
 
 def test_list_personas_exposes_only_ids_and_neutral_names():
     personas = list_personas()
-    assert len(personas) == 65
+    assert len(personas) == 65 + int((REPO / "fixtures" / "nights_worsening_sample.csv").exists())
     for p in personas:
         assert set(p) == {"persona_id", "display_name"}
         assert re.fullmatch(r"Demo person P\d{3}", p["display_name"])
@@ -114,7 +114,7 @@ def test_fixture_persona_is_listed_and_loadable_from_a_fixtures_folder(tmp_path)
     worsening["person_id"] = "W900"
     write_csv(tmp_path, worsening, "nights_worsening_sample.csv", header="# SYNTHETIC DATA\n")
     ids = [p["persona_id"] for p in list_personas(fixtures_dir=tmp_path)]
-    assert ids[-1] == "W900" and len(ids) == 66
+    assert ids[-1] == "W900" and len(ids) == 66  # the temporary folder has no worsening fixture of its own
     nights = load_synthetic_nights("W900", fixtures_dir=tmp_path)
     assert len(nights) == 14 and all(n.source == "synthetic" for n in nights)
 
@@ -125,6 +125,35 @@ def test_real_worsening_fixture_is_listed_when_the_file_exists():
         pytest.skip("fixtures/nights_worsening_sample.csv has not been added yet")
     ids = {p["persona_id"] for p in list_personas()}
     assert set(pd.read_csv(path, comment="#")["person_id"].astype(str)) <= ids
+    assert path.read_text().splitlines()[0].startswith("# SYNTHETIC DATA")
+    assert "modified for demo purposes" in path.read_text().splitlines()[1]
+
+
+def test_worsening_demo_person_loads_and_its_last_week_differs():
+    path = REPO / "fixtures" / "nights_worsening_sample.csv"
+    if not path.exists():
+        pytest.skip("fixtures/nights_worsening_sample.csv has not been added yet")
+    from app.services.screening.service import compute_features, score_apnea
+
+    nights = load_nights("synthetic", persona_id="P901")
+    assert len(nights) == 25 and all(n.source == "synthetic" and n.night_id.startswith("P901") for n in nights)
+
+    # P901 is P019's first 28 nights with the last 7 modified, so compare night by night.
+    original = {n.date: n for n in load_nights("synthetic", persona_id="P019")}
+    pairs = [(n, original[n.date]) for n in nights]
+    assert all(a.spo2_pct == b.spo2_pct and a.disturbance_count == b.disturbance_count for a, b in pairs[:-7])
+    for changed, orig in pairs[-7:]:
+        assert changed.spo2_pct == pytest.approx(orig.spo2_pct - 1.5, abs=0.01)
+        assert changed.sleep_efficiency_pct == pytest.approx(orig.sleep_efficiency_pct - 6.0, abs=0.01)
+        assert changed.disturbance_count == round(orig.disturbance_count * 1.3)
+
+    features = compute_features(nights)
+    z = features.baseline_z_scores
+    assert z["sleep_efficiency_pct"] < -1 and z["disturbance_count"] > 0 and z["spo2_pct"] < 0
+    profile = load_synthetic_profile("P901")
+    assert profile.age == load_synthetic_profile("P019").age
+    score = score_apnea(profile, features)
+    assert score.tier in ("Low", "Moderate", "High") and any("7-night average" in f for f in score.top_factors)
 
 
 # CSV provider

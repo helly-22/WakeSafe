@@ -19,6 +19,8 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 SYNTHETIC_DIR = REPO_ROOT / "synthetic_data" / "out"
 FIXTURES_DIR = REPO_ROOT / "fixtures"
 DEMO_FIXTURE_FILES = ("nights_worsening_sample.csv",)
+# Demo-only people built from another synthetic person's nights reuse that person's intake answers.
+DEMO_PROFILE_SOURCE = {"P901": "P019"}
 
 
 class PersonaInfo(TypedDict):
@@ -80,7 +82,7 @@ def _split(value: object) -> list[str]:
 def load_synthetic_profile(persona_id: str, *, synthetic_dir: Path = SYNTHETIC_DIR) -> ProfileInput:
     """The made-up intake answers for one demo person, so the UI can run a full demo from one id."""
     profiles = _read("profiles.csv", synthetic_dir)
-    row = profiles[profiles["person_id"].astype(str) == persona_id]
+    row = profiles[profiles["person_id"].astype(str) == DEMO_PROFILE_SOURCE.get(persona_id, persona_id)]
     if row.empty:
         raise ProviderDataError(f"No demo profile for '{persona_id}'.")
     r = row.iloc[0]
