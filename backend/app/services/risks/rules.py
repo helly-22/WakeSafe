@@ -257,6 +257,13 @@ def _active_travel_signals(flags: list[str]) -> set[str]:
     return out
 
 
+_MALE_SEX = {"male", "m", "man"}
+
+
+def _is_male(sex: str | None) -> bool:
+    return sex is not None and sex.strip().lower() in _MALE_SEX
+
+
 def _condition_matches(conditions: list[str], keywords: tuple[str, ...]) -> list[str]:
     hits: list[str] = []
     for cond in conditions:
@@ -273,6 +280,16 @@ def _score_group(
     travel_signals: set[str],
     apnea: ApneaScore,
 ) -> _GroupScore:
+    # Menopause does not apply to a male profile. Unknown or other sex answers still score, so a
+    # profile with no intake answers (the demo scenarios) is unaffected.
+    if group == "menopause" and _is_male(profile.sex):
+        return _GroupScore(
+            points=0.0,
+            reasons=["Not applicable: menopause screening is not applied to a male profile."],
+            sources={"patient_reported"},
+            travel_softened=False,
+        )
+
     reasons: list[str] = []
     sources: set[SourceLabel] = set()
     points = 0.0
