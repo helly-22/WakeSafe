@@ -47,10 +47,6 @@ export function SignalsPanel({ data, className }: { data: AnalyzeResponse; class
             nightsAvailable={features.nights_available}
             baselineNights={BASELINE_NIGHTS}
           />
-          <p className="fineprint">
-            Hover or use the arrow keys to compare a night across signals. Each row has its own scale. Baseline notes are
-            app-calculated and describe direction only, not good or bad.
-          </p>
         </>
       ) : (
         <p className="empty-note">Nightly records were not included in this response.</p>

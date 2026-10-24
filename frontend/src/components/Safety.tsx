@@ -11,12 +11,10 @@ export function Disclaimer({ text = SCREENING_DISCLAIMER }: { text?: string }) {
 }
 
 /**
- * Emergency guidance. Rendered before any routine content whenever
- * risk_assessment.urgent_override is true (TEAM_CONTRACTS.md §3.5). This is the
- * only element that uses urgent red styling.
+ * Call-911 guidance. The only element that uses urgent red styling. Rendered
+ * before routine content (TEAM_CONTRACTS.md §1, §3.5).
  */
-export function UrgentBanner({ assessment }: { assessment: RiskAssessment }) {
-  if (!assessment.urgent_override) return null;
+export function EmergencyBanner({ reasons, intro }: { reasons: string[]; intro?: string }) {
   return (
     <section className="urgent" role="alert" aria-labelledby="urgent-title">
       <div className="urgent__icon" aria-hidden="true">
@@ -27,12 +25,12 @@ export function UrgentBanner({ assessment }: { assessment: RiskAssessment }) {
           Call 911 now
         </h2>
         <p className="urgent__text">
-          You reported a symptom that can be a sign of a medical emergency. Call 911 or your local emergency number
-          right away. Do not wait for sleep screening results.
+          {intro ??
+            'You reported a symptom that can be a sign of a medical emergency. Call 911 or your local emergency number right away. Do not wait for sleep screening results.'}
         </p>
-        {assessment.urgent_reasons.length > 0 && (
+        {reasons.length > 0 && (
           <ul className="urgent__reasons">
-            {assessment.urgent_reasons.map((r) => (
+            {reasons.map((r) => (
               <li key={r}>{r}</li>
             ))}
           </ul>
@@ -44,4 +42,10 @@ export function UrgentBanner({ assessment }: { assessment: RiskAssessment }) {
       </div>
     </section>
   );
+}
+
+/** Emergency guidance driven by the backend's risk_assessment.urgent_override. */
+export function UrgentBanner({ assessment }: { assessment: RiskAssessment }) {
+  if (!assessment.urgent_override) return null;
+  return <EmergencyBanner reasons={assessment.urgent_reasons} />;
 }

@@ -7,15 +7,15 @@
 import type { AnalyzeResponse, DemoPersona } from '../../lib/types';
 import { FIXTURE_FEATURES, FIXTURE_NIGHTS } from './generatedFixtures';
 
-const FIXTURE_VERSION = 'fixture-v1';
-const EVIDENCE_NOTE = 'Illustrative fixture output for the synthetic demo; not a clinical prediction.';
+const DEMO_VERSION = 'demo-v1';
+const EVIDENCE_NOTE = 'Demo result. Not a verified clinical finding.';
 const DISCLAIMER = 'Screening aid only; not a diagnosis. Consider discussing results with a clinician.';
 
 export const MOCK_PERSONAS: DemoPersona[] = [
   {
     persona_id: 'maya_demo',
-    display_name: 'Maya (synthetic)',
-    description: '52, snoring and daytime tiredness, 14 nights of data.',
+    display_name: 'Maya',
+    description: '14 nights of wearable data.',
     profile: {
       age: 52,
       sex: 'female',
@@ -29,8 +29,8 @@ export const MOCK_PERSONAS: DemoPersona[] = [
   },
   {
     persona_id: 'jordan_demo',
-    display_name: 'Jordan (synthetic)',
-    description: '34, only 5 nights and no SpO₂: shows missing-data handling.',
+    display_name: 'Jordan',
+    description: '5 nights of wearable data, no SpO₂ recorded.',
     profile: {
       age: 34,
       sex: 'male',
@@ -44,8 +44,8 @@ export const MOCK_PERSONAS: DemoPersona[] = [
   },
   {
     persona_id: 'riley_demo',
-    display_name: 'Riley (synthetic)',
-    description: '61, reports chest pain: shows the urgent-symptom screen.',
+    display_name: 'Riley',
+    description: '10 nights of wearable data.',
     profile: {
       age: 61,
       sex: 'female',
@@ -79,7 +79,7 @@ export const MOCK_ANALYSES: Record<string, AnalyzeResponse> = {
         'Reported high blood pressure',
         'Resting heart rate above personal baseline in recent nights',
       ],
-      model_version: FIXTURE_VERSION,
+      model_version: DEMO_VERSION,
       evidence_note: EVIDENCE_NOTE,
     },
     risk_assessment: {
@@ -100,7 +100,7 @@ export const MOCK_ANALYSES: Record<string, AnalyzeResponse> = {
       ],
       urgent_override: false,
       urgent_reasons: [],
-      rules_version: FIXTURE_VERSION,
+      rules_version: DEMO_VERSION,
       disclaimer: DISCLAIMER,
     },
     explanation: {
@@ -111,7 +111,7 @@ export const MOCK_ANALYSES: Record<string, AnalyzeResponse> = {
           'This screening combines reported symptoms with wearable trends. It is a risk signal, not a diagnosis. A sleep medicine clinician can decide whether a sleep study is appropriate.',
       },
       limitations: [
-        'Synthetic demo data; illustrative only.',
+        'Wearable measurements and screening outputs are not verified clinical findings.',
         'Wearable summaries cannot measure breathing events directly.',
         'SpO₂ was missing on some nights.',
       ],
@@ -127,7 +127,7 @@ export const MOCK_ANALYSES: Record<string, AnalyzeResponse> = {
       probability: null,
       stop_bang_score: null,
       top_factors: ['Reported snoring', 'Limited history: only 5 nights available'],
-      model_version: FIXTURE_VERSION,
+      model_version: DEMO_VERSION,
       evidence_note: EVIDENCE_NOTE,
     },
     risk_assessment: {
@@ -147,7 +147,7 @@ export const MOCK_ANALYSES: Record<string, AnalyzeResponse> = {
       ],
       urgent_override: false,
       urgent_reasons: [],
-      rules_version: FIXTURE_VERSION,
+      rules_version: DEMO_VERSION,
       disclaimer: DISCLAIMER,
     },
     explanation: {
@@ -158,7 +158,7 @@ export const MOCK_ANALYSES: Record<string, AnalyzeResponse> = {
           'With only a few nights of data, this screening relies mostly on reported symptoms. More nights would make trends easier to interpret.',
       },
       limitations: [
-        'Synthetic demo data; illustrative only.',
+        'Wearable measurements and screening outputs are not verified clinical findings.',
         'SpO₂ was not recorded on any night.',
         'Fewer nights than needed for a personal baseline.',
       ],
@@ -174,7 +174,7 @@ export const MOCK_ANALYSES: Record<string, AnalyzeResponse> = {
       probability: null,
       stop_bang_score: null,
       top_factors: ['Reported snoring', 'Reported witnessed breathing pauses', 'Reported daytime tiredness'],
-      model_version: FIXTURE_VERSION,
+      model_version: DEMO_VERSION,
       evidence_note: EVIDENCE_NOTE,
     },
     risk_assessment: {
@@ -200,7 +200,7 @@ export const MOCK_ANALYSES: Record<string, AnalyzeResponse> = {
       ],
       urgent_override: true,
       urgent_reasons: ['Chest pain was reported.'],
-      rules_version: FIXTURE_VERSION,
+      rules_version: DEMO_VERSION,
       disclaimer: DISCLAIMER,
     },
     explanation: {
@@ -210,7 +210,7 @@ export const MOCK_ANALYSES: Record<string, AnalyzeResponse> = {
         sleep_disordered_breathing:
           'Reported sleep symptoms are also a risk signal worth raising with a clinician once the urgent concern has been addressed.',
       },
-      limitations: ['Synthetic demo data; illustrative only.', 'Only 10 nights available; no personal baseline yet.'],
+      limitations: ['Wearable measurements and screening outputs are not verified clinical findings.', 'Only 10 nights available; no personal baseline yet.'],
       generated_by: 'template',
     },
     data_provenance: ['synthetic'],

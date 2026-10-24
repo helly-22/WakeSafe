@@ -13,5 +13,5 @@
     "skipLibCheck": true,
     "strict": true
   },
-  "include": ["vite.config.ts", "pwa/precachePlugin.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts", "pwa/precachePlugin.ts"]
 }

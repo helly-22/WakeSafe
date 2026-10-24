@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useSession } from '../hooks/useSession';
 import type { AnalyzeResponse } from '../lib/types';
 
-/** Renders children only once an analysis is ready; otherwise shows loading, error or empty states. */
+/** Renders children only once results are ready; otherwise shows deliberate loading, error or empty states. */
 export function AnalysisGate({ children }: { children: (data: AnalyzeResponse) => ReactNode }) {
   const { analysis, personas, selectPersona } = useSession();
 
@@ -11,23 +11,29 @@ export function AnalysisGate({ children }: { children: (data: AnalyzeResponse) =
       return <>{children(analysis.data)}</>;
     case 'loading':
       return (
-        <p className="state" role="status">
-          Loading synthetic screening data…
-        </p>
+        <div className="state state--loading" role="status">
+          <span className="state__pulse" aria-hidden="true" />
+          <p>Loading your results…</p>
+        </div>
       );
     case 'error':
       return (
-        <p className="state state--error" role="alert">
-          {analysis.message}
-        </p>
+        <div className="state state--error" role="alert">
+          <h2 className="state__title">We couldn’t load your results</h2>
+          <p>{analysis.message}</p>
+          <button type="button" className="btn" onClick={() => window.location.reload()}>
+            Try again
+          </button>
+        </div>
       );
     case 'idle':
       return (
         <div className="state">
-          <p>Session cleared. No data is loaded.</p>
+          <h2 className="state__title">Session cleared</h2>
+          <p>Your saved answers were removed from this device. Choose a profile to start again.</p>
           {personas[0] && (
             <button type="button" className="btn" onClick={() => selectPersona(personas[0]!.persona_id)}>
-              Load a demo persona
+              Choose a profile
             </button>
           )}
         </div>

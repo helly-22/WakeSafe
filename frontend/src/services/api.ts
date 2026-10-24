@@ -38,13 +38,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export async function getPersonas(): Promise<DemoPersona[]> {
   if (USE_MOCKS) return structuredClone(MOCK_PERSONAS);
-  return request<DemoPersona[]>('/api/demo/personas');
+  const list = await request<DemoPersona[]>('/api/demo/personas');
+  const people = list.map((p) => ({ ...p, description: plainDescription(p.description) }));
+  // The named scenarios (SYN-*) come first; the numbered people follow in the API's order.
+  const scenario = (p: DemoPersona) => (p.persona_id.startsWith('SYN-') ? 0 : 1);
+  return people.sort((a, b) => scenario(a) - scenario(b));
+}
+
+/** The API describes each profile in its own words; the app shows only the night count. */
+function plainDescription(text: string): string {
+  const nights = /(\d+)\s+(?:\w+\s+)?nights/.exec(text);
+  return nights ? `${nights[1]} nights of wearable data.` : '';
 }
 
 export async function analyze(body: AnalyzeRequest): Promise<AnalyzeResponse> {
   if (USE_MOCKS) {
     const fixture = body.persona_id ? MOCK_ANALYSES[body.persona_id] : undefined;
-    if (!fixture) throw new ApiError(`No synthetic fixture for persona "${body.persona_id ?? ''}".`, 404);
+    if (!fixture) throw new ApiError(`No demo data for profile "${body.persona_id ?? ''}".`, 404);
     return structuredClone(fixture);
   }
   return request<AnalyzeResponse>('/api/screening/analyze', { method: 'POST', body: JSON.stringify(body) });

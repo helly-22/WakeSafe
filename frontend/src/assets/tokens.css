@@ -60,6 +60,8 @@
   --fs-num-md: 1.9rem;
   --fs-num-lg: 3.1rem;
   --fs-display: clamp(2.8rem, 4.2vw, 3.8rem);
+  /* Large iOS-style page title: spacious on desktop, contained on phones. */
+  --fs-title: clamp(2.25rem, 1.4rem + 3.6vw, 3.6rem);
   --fw-regular: 450;
   --fw-medium: 560;
   --fw-bold: 680;

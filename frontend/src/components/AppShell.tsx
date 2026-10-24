@@ -1,9 +1,8 @@
 import type { ComponentType } from 'react';
 import { NavLink, Outlet } from 'react-router';
+import { QuestionnaireEmergency } from '../features/questionnaire/ScreeningInputsNotice';
 import { useInstallPrompt } from '../hooks/useInstallPrompt';
 import { useSession } from '../hooks/useSession';
-import { USE_MOCKS } from '../services/api';
-import { SyntheticBadge } from './Badges';
 import { CareIcon, IntakeIcon, MoonLogo, OverviewIcon, ReportIcon, TrendsIcon } from './Icons';
 
 interface NavItem {
@@ -53,7 +52,6 @@ export function AppShell() {
           </ul>
         </nav>
         <div className="sidebar__footer">
-          {USE_MOCKS && <SyntheticBadge compact />}
           {canInstall && (
             <button type="button" className="btn btn--small" onClick={() => void install()}>
               Install app
@@ -62,7 +60,7 @@ export function AppShell() {
           <button type="button" className="btn btn--ghost btn--small" onClick={clearSession} disabled={personaId === null}>
             Clear session
           </button>
-          <p className="sidebar__note">Screening aid only. Not a diagnosis. Not affiliated with WHOOP.</p>
+          <p className="sidebar__note">Screening aid only, not a diagnosis. WakeSafe is not affiliated with WHOOP.</p>
         </div>
       </aside>
 
@@ -77,11 +75,11 @@ export function AppShell() {
               Install
             </button>
           )}
-          {USE_MOCKS && <SyntheticBadge compact />}
         </div>
       </header>
 
       <main id="main" className="main" tabIndex={-1}>
+        <QuestionnaireEmergency />
         <Outlet />
       </main>
 

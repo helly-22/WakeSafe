@@ -4,16 +4,17 @@ import { StageChart } from '../components/charts/StageChart';
 import { PageHeader } from '../components/PageHeader';
 import { Disclaimer, UrgentBanner } from '../components/Safety';
 import { DataCoverageCard } from '../features/overview/DataCoverageCard';
+import { ScreeningSignals } from '../features/overview/ScreeningSignals';
 import { SignalsPanel } from '../features/overview/SignalsPanel';
 import { TrendExplorer } from '../features/overview/TrendExplorer';
 import { formatWindow } from '../lib/format';
 import { TREND_PAGE_SERIES } from '../lib/series';
 
-/** Every nightly series in one explorer, plus sleep stages and the shared-hover signal stack. */
+/** All the detail: every nightly series, sleep stages, shared-hover signals, signal counts and data coverage. */
 export function SleepTrendsPage() {
   return (
     <>
-      <PageHeader title="Sleep Trends" subtitle="Nightly values across the data window. Shaded nights have no data." />
+      <PageHeader title="Sleep Trends" subtitle="Nightly values across your data window." />
       <AnalysisGate>
         {(data) => (
           <>
@@ -33,11 +34,14 @@ export function SleepTrendsPage() {
                 ) : (
                   <p className="empty-note">Nightly records were not included in this response.</p>
                 )}
-                <p className="fineprint">Wearable-measured deep and REM; other is app-calculated. Hover or use the arrow keys to read a night.</p>
               </Card>
 
               <DataCoverageCard data={data} className="dash__narrow" />
               <SignalsPanel data={data} className="dash__full" />
+
+              <Card eyebrow="Screening" title="Signals behind your result" className="dash__full">
+                <ScreeningSignals data={data} detail />
+              </Card>
             </div>
 
             <Disclaimer />

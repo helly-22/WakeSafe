@@ -55,10 +55,28 @@ const QUALITY_FLAG_TEXT: Record<string, string> = {
   spo2_partially_missing: 'Blood oxygen (SpO₂) is missing on some nights.',
   skin_temperature_unavailable: 'Skin temperature was not recorded.',
   sleep_summary_missing_some_nights: 'Sleep summary is missing on some nights.',
+  spo2_partial: 'Blood oxygen (SpO₂) is missing on some nights.',
+  short_baseline_history: 'Not enough nights yet for a personal baseline.',
+  synthetic_data: '',
 };
 
+/** Display label for a data_provenance identifier. The identifiers themselves are unchanged. */
+export function provenanceLabel(id: string): string {
+  if (id === 'synthetic') return 'demo wearable data';
+  if (id === 'csv') return 'uploaded file';
+  if (id === 'whoop') return 'WHOOP';
+  return id;
+}
+
+/** Plain text for a flag, or an empty string when there is nothing worth showing. */
 export function describeQualityFlag(flag: string): string {
-  return QUALITY_FLAG_TEXT[flag] ?? flag.replaceAll('_', ' ');
+  const known = QUALITY_FLAG_TEXT[flag];
+  if (known !== undefined) return known;
+  if (flag.startsWith('travel:altitude')) return 'High-altitude travel was noted in this period.';
+  if (flag.startsWith('travel:jetlag')) return 'Travel across time zones was noted in this period.';
+  if (flag.startsWith('travel:')) return 'Travel was noted in this period.';
+  if (flag.startsWith('cycle:')) return 'A cycle-related change was noted in this period.';
+  return flag.replaceAll('_', ' ');
 }
 
 /** Pulls one metric across nights, keeping nulls so charts can show gaps. */

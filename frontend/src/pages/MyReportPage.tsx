@@ -4,12 +4,12 @@ export function MyReportPage() {
   return (
     <ShellPage
       title="My Report"
-      subtitle="A clinician-ready summary built only from structured screening data."
-      planned={[
-        'Report preview from POST /api/reports/preview',
-        'PDF download from POST /api/reports/pdf',
-        'Provenance, generation time, model and rules versions, limitations',
-        'Trend charts and a nightly-values appendix, readable in black and white',
+      subtitle="A clinician-ready summary you can bring to an appointment."
+      heading="Your report is coming soon"
+      items={[
+        'A preview of your flagged risks, reported history and wearable trends',
+        'Data quality, limitations and the versions behind each result',
+        'A PDF you can download and share with your clinician',
       ]}
     />
   );

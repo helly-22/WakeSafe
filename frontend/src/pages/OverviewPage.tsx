@@ -1,22 +1,21 @@
 import { AnalysisGate } from '../components/AnalysisGate';
+import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
-import { Disclaimer, UrgentBanner } from '../components/Safety';
-import { DataCoverageCard } from '../features/overview/DataCoverageCard';
-import { NextStepsCard } from '../features/overview/NextStepsCard';
-import { ScreeningOverview } from '../features/overview/ScreeningOverview';
-import { SignalsPanel } from '../features/overview/SignalsPanel';
-import { SleepHero } from '../features/overview/SleepHero';
-import { TrendExplorer } from '../features/overview/TrendExplorer';
-import { WhyFlaggedCard } from '../features/overview/WhyFlaggedCard';
+import { UrgentBanner } from '../components/Safety';
+import { ScreeningInputsNotice } from '../features/questionnaire/ScreeningInputsNotice';
+import { ResultDetails } from '../features/overview/ResultDetails';
+import { RiskSummary } from '../features/overview/RiskSummary';
+import { ScreeningSignals } from '../features/overview/ScreeningSignals';
+import { SleepSnapshot } from '../features/overview/SleepSnapshot';
 import { useSession } from '../hooks/useSession';
 import { formatWindow } from '../lib/format';
-import { OVERVIEW_SERIES } from '../lib/series';
 
+/** Overview: at-a-glance only. Charts, nightly signals and data coverage live on Sleep Trends. */
 export function OverviewPage() {
   const { persona, analysis } = useSession();
   const subtitle =
     analysis.status === 'ready'
-      ? `${persona?.display_name ?? 'Demo'} · ${formatWindow(analysis.data.features.window_start, analysis.data.features.window_end)} · ${analysis.data.features.nights_available} nights`
+      ? `${persona?.display_name ?? 'Profile'} · ${formatWindow(analysis.data.features.window_start, analysis.data.features.window_end)} · ${analysis.data.features.nights_available} nights`
       : undefined;
 
   return (
@@ -25,20 +24,17 @@ export function OverviewPage() {
       <AnalysisGate>
         {(data) => (
           <>
-            {/* Emergency guidance always comes before routine content. */}
+            {/* Emergency guidance always comes before everything else. */}
             <UrgentBanner assessment={data.risk_assessment} />
-
+            <RiskSummary data={data} />
+            <ScreeningInputsNotice />
             <div className="dash">
-              <SleepHero data={data} className="dash__a" />
-              <ScreeningOverview data={data} className="dash__b" />
-              <SignalsPanel data={data} className="dash__full" />
-              <TrendExplorer data={data} series={OVERVIEW_SERIES} className="dash__c" />
-              <DataCoverageCard data={data} className="dash__d" />
-              <WhyFlaggedCard data={data} className="dash__e" />
-              <NextStepsCard urgent={data.risk_assessment.urgent_override} className="dash__f" />
+              <SleepSnapshot data={data} className="dash__b" />
+              <Card eyebrow="Key signals" title="What shaped this result" className="dash__e">
+                <ScreeningSignals data={data} />
+              </Card>
             </div>
-
-            <Disclaimer />
+            <ResultDetails data={data} />
           </>
         )}
       </AnalysisGate>

@@ -2,22 +2,14 @@ import { SOURCE_LABEL_TEXT } from '../lib/format';
 import { baselineDirection } from '../lib/metrics';
 import type { SourceLabel } from '../lib/types';
 
-/** Compact, always-visible marker that everything on screen is illustrative. */
-export function SyntheticBadge({ compact = false }: { compact?: boolean }) {
-  return (
-    <span className="synthetic-flag" title="All values shown are synthetic and illustrative. Not real patient data.">
-      <span className="synthetic-flag__dot" aria-hidden="true" />
-      {compact ? 'Synthetic' : 'Synthetic demo · illustrative'}
-    </span>
-  );
-}
+export const DEMO_DISCLOSURE = 'Measurements and screening outputs are not verified clinical findings.';
 
 const SOURCE_HELP: Record<SourceLabel, string> = {
   patient_reported: 'Answers entered in the health intake.',
   wearable_measured: 'Nightly summaries recorded by the wearable.',
   app_calculated: 'Derived by the app from other values, such as baseline comparisons.',
   model_estimated: 'Output of the screening model.',
-  simulated: 'Simulated for the demo.',
+  simulated: 'Estimated for the demo.',
 };
 
 /** Provenance marker: a colored dot and plain text, not a boxed pill. */

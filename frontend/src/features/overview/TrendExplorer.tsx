@@ -90,14 +90,6 @@ export function TrendExplorer({ data, series, initial, eyebrow = 'Sleep history'
       ) : (
         <p className="empty-note">Nightly records were not included in this response.</p>
       )}
-
-      <p className="fineprint">
-        <span className="src src--wearable_measured">
-          <i className="src__dot" aria-hidden="true" />
-          Wearable-measured
-        </span>{' '}
-        · Shaded nights have no data. Hover or use the arrow keys to read a night.
-      </p>
     </Card>
   );
 }

@@ -1,6 +1,6 @@
 import { Card } from '../../components/Card';
 import { CoverageMatrix } from '../../components/charts/CoverageMatrix';
-import { describeQualityFlag } from '../../lib/format';
+import { describeQualityFlag, provenanceLabel } from '../../lib/format';
 import { BASELINE_NIGHTS } from '../../lib/metrics';
 import type { AnalyzeResponse } from '../../lib/types';
 
@@ -10,6 +10,7 @@ export function DataCoverageCard({ data, className }: { data: AnalyzeResponse; c
   const total = features.nights_available;
   const baselineReady = total >= BASELINE_NIGHTS;
   const progress = Math.min(total / BASELINE_NIGHTS, 1);
+  const flags = features.data_quality_flags.filter((f) => describeQualityFlag(f) !== '');
 
   return (
     <Card eyebrow="Data coverage" title="What this is based on" className={className}>
@@ -34,9 +35,9 @@ export function DataCoverageCard({ data, className }: { data: AnalyzeResponse; c
         <p className="fineprint">{baselineReady ? 'Enough nights for baseline comparisons.' : 'Not enough nights yet for baseline comparisons.'}</p>
       </div>
 
-      {features.data_quality_flags.length > 0 ? (
+      {flags.length > 0 ? (
         <ul className="flags">
-          {features.data_quality_flags.map((f) => (
+          {flags.map((f) => (
             <li key={f} className="flags__item">
               <span aria-hidden="true" className="flags__mark" />
               {describeQualityFlag(f)}
@@ -48,8 +49,7 @@ export function DataCoverageCard({ data, className }: { data: AnalyzeResponse; c
       )}
 
       <p className="fineprint">
-        Data source: {data_provenance.length ? data_provenance.join(', ') : 'unknown'}
-        {data_provenance.includes('synthetic') && ' (illustrative, not real patient data)'}
+        Data source: {data_provenance.length ? data_provenance.map(provenanceLabel).join(', ') : 'unknown'}
       </p>
     </Card>
   );
