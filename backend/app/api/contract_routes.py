@@ -81,33 +81,37 @@ def _helly_persona_ids() -> set[str]:
     return {f"SYN-{key}" for key in PERSONA_FILES}
 
 
-def _load_helly_persona(persona_id: str) -> tuple[ProfileInput, list[NightRecord]] | None:
+def _load_helly_persona(
+    persona_id: str,
+) -> tuple[ProfileInput, list[NightRecord], list[str]] | None:
     key = persona_id.strip().upper()
     if key not in _helly_persona_ids():
         return None
     try:
-        _, profile, nights = load_demo(key)
+        _, profile, nights, flags = load_demo(key)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=500, detail=f"Demo fixture missing on server: {exc}")
-    return profile, nights
+    return profile, nights, flags
 
 
-def _nights_and_profile(body: AnalyzeRequest) -> tuple[ProfileInput, list[NightRecord]]:
+def _nights_and_profile(
+    body: AnalyzeRequest,
+) -> tuple[ProfileInput, list[NightRecord], list[str]]:
     profile = body.profile
     intake_given = bool(profile.model_fields_set)
     try:
         if body.data_source == "synthetic":
             helly = _load_helly_persona(body.persona_id) if body.persona_id else None
             if helly is not None:
-                return (profile if intake_given else helly[0]), helly[1]
+                return (profile if intake_given else helly[0]), helly[1], helly[2]
             nights = load_nights("synthetic", persona_id=body.persona_id)
             if not intake_given:
                 pid = body.persona_id or list_personas()[0]["persona_id"]
                 profile = load_synthetic_profile(pid)
-            return profile, nights
+            return profile, nights, []
         if body.data_source == "csv":
-            return profile, load_nights("csv", csv_file=body.csv_text)
-        return profile, load_nights("whoop")
+            return profile, load_nights("csv", csv_file=body.csv_text), []
+        return profile, load_nights("whoop"), []
     except NotImplementedError as exc:
         raise HTTPException(status_code=501, detail=str(exc))
     except ProviderDataError as exc:
@@ -147,7 +151,7 @@ def demo_personas() -> list[DemoPersona]:
         loaded = _load_helly_persona(f"SYN-{key}") if (_fixture_exists(key)) else None
         if loaded is None:
             continue
-        profile, nights = loaded
+        profile, nights, _flags = loaded
         out.append(
             DemoPersona(
                 persona_id=f"SYN-{key}",
@@ -176,8 +180,8 @@ def _helly_display_name(key: str) -> str:
 
 @router.post("/screening/analyze", response_model=AnalyzeResponse)
 def analyze(body: AnalyzeRequest) -> AnalyzeResponse:
-    profile, nights = _nights_and_profile(body)
-    features, apnea, assessment = run_screen(profile, nights)
+    profile, nights, flags = _nights_and_profile(body)
+    features, apnea, assessment = run_screen(profile, nights, flags)
     report = build_report(profile, nights, features, apnea, assessment, device_label=_device_label(nights))
     explanation = explain_report(report)
     return AnalyzeResponse(
@@ -202,8 +206,8 @@ def care_recommendations(body: CareRecommendationsRequest) -> CareRecommendation
 
 @router.post("/reports/preview", response_model=ClinicianReportData)
 def report_preview(body: ReportPreviewRequest) -> ClinicianReportData:
-    profile, nights = _nights_and_profile(body)
-    features, apnea, assessment = run_screen(profile, nights)
+    profile, nights, flags = _nights_and_profile(body)
+    features, apnea, assessment = run_screen(profile, nights, flags)
     report = build_report(profile, nights, features, apnea, assessment, device_label=_device_label(nights))
     return report.model_copy(update={"explanations": explain_report(report)})
 

@@ -8,6 +8,18 @@ Public entry point:
 Screening aid only. Imports types from the frozen contract (app.models.schemas);
 it never changes them.
 """
-from .rules import RULES_VERSION, assess_risks
+from .rules import (
+    RULES_VERSION,
+    assess_risks,
+    care_warranted_outside_travel,
+    infer_travel_from_locations,
+    travel_track_only_risk_ids,
+)
 
-__all__ = ["assess_risks", "RULES_VERSION"]
+__all__ = [
+    "assess_risks",
+    "RULES_VERSION",
+    "care_warranted_outside_travel",
+    "infer_travel_from_locations",
+    "travel_track_only_risk_ids",
+]

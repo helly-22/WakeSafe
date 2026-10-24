@@ -5,6 +5,8 @@ Exposes the existing, tested services over HTTP:
     GET  /health              liveness
     POST /screen              profile + nights -> RiskAssessment (+ ApneaScore, FeatureSet)
     POST /care                RiskAssessment + location -> CareRecommendations
+                              (also at POST /api/care/recommendations, the
+                              TEAM_CONTRACTS.md §4.3 name the frontend calls)
     POST /explain             ClinicianReportData (or pieces) -> Explanation
     POST /report              pieces -> ClinicianReportData (one-page brief)
     GET  /demo/{persona}      full chain for a synthetic persona, in one call
@@ -47,7 +49,16 @@ def root() -> dict:
         "service": "WakeSafe API",
         "status": "ok",
         "docs": "/docs",
-        "endpoints": ["/health", "/screen", "/care", "/explain", "/report", "/demo/{persona}"],
+        "endpoints": [
+            "/health",
+            "/nudges",
+            "/screen",
+            "/care",
+            "/api/care/recommendations",
+            "/explain",
+            "/report",
+            "/demo/{persona}",
+        ],
         "contract_endpoints": [
             "/api/health",
             "/api/demo/personas",

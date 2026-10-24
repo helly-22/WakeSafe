@@ -19,7 +19,7 @@
     {
       "persona_id": "SYN-MENOPAUSE",
       "nights": 14,
-      "travel_nights": 0
+      "travel_nights": 7
     },
     {
       "persona_id": "SYN-CARDIO",
@@ -28,13 +28,13 @@
     },
     {
       "persona_id": "SYN-ALTITUDE",
-      "nights": 5,
-      "travel_nights": 4
+      "nights": 14,
+      "travel_nights": 7
     },
     {
       "persona_id": "SYN-JETLAG",
-      "nights": 5,
-      "travel_nights": 4
+      "nights": 14,
+      "travel_nights": 7
     }
   ]
 }
