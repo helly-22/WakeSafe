@@ -1,11 +1,13 @@
 """Train and validate the heart-rate/HRV apnea screening model.
 
-Trains on ml/data/processed/apnea_ecg_nights.csv only (real Apnea-ECG recordings).
-Never reads or trains on synthetic data. Borderline (group b) recordings are excluded.
+Trains on ml/data/processed/apnea_ecg_nights.csv only (real Apnea-ECG recordings, learning
+and test sets). Never reads or trains on synthetic data. Borderline (class b) recordings
+are excluded.
 
-Validation is leave-one-person-out. Each recording is a different person, so this
-is leave-one-out over recordings. AUROC comes from the pooled held-out predictions,
-with a bootstrap 95% confidence interval over recordings.
+Validation is leave-one-subject-out. The 70 Apnea-ECG recordings come from 32 people, so
+all recordings of one person are held out together (subject_id, inferred from identical age,
+sex, height and weight). AUROC comes from the pooled held-out predictions, with a bootstrap
+95% confidence interval that resamples subjects, not recordings.
 
 Usage: python ml/training/train_apnea_model.py
 """
@@ -32,11 +34,12 @@ SEED = 0
 
 LIMITATIONS = (
     "Domain shift: this model was trained on clinical ECG recordings from the PhysioNet "
-    "Apnea-ECG learning set (a small number of people in a sleep lab), and it is applied to "
+    "Apnea-ECG database (32 people in a sleep lab), and it is applied to "
     "wrist-wearable nightly summaries. Accuracy on WHOOP data is not claimed and has not been "
     "measured. The task validated here is separating apnea-group recordings from control-group "
     "recordings, not finding apnea in the general public. Borderline recordings were excluded. "
-    "The sample is small, so the confidence interval is wide. WakeSafe is a screening aid, "
+    "The sample is small, so the confidence interval is wide. Subjects were inferred from "
+    "matching age, sex, height and weight, which may not be exact. WakeSafe is a screening aid, "
     "not a diagnosis."
 )
 
@@ -45,11 +48,25 @@ def make_model() -> object:
     return make_pipeline(StandardScaler(), LogisticRegression(C=1.0, class_weight="balanced", max_iter=1000))
 
 
-def bootstrap_auroc_ci(y: np.ndarray, p: np.ndarray, n_boot: int = N_BOOT, seed: int = SEED) -> tuple[float, float]:
+def assert_real_data(df: pd.DataFrame, path: Path) -> None:
+    """Refuse synthetic input: training and evaluation use real sleep-study recordings only."""
+    first_line = path.read_text().splitlines()[0] if path.exists() else ""
+    flagged = "is_synthetic" in df.columns and df["is_synthetic"].astype(bool).any()
+    if flagged or "SYNTHETIC" in first_line.upper() or "synthetic" in df.get("source", pd.Series(dtype=str)).astype(str).values:
+        raise ValueError(f"{path} looks synthetic; training and evaluation accept real recordings only")
+
+
+def bootstrap_auroc_ci(
+    y: np.ndarray, p: np.ndarray, groups: np.ndarray, n_boot: int = N_BOOT, seed: int = SEED
+) -> tuple[float, float]:
+    """Percentile bootstrap that resamples whole groups (subjects) with replacement."""
     rng = np.random.default_rng(seed)
+    members = {g: np.flatnonzero(groups == g) for g in np.unique(groups)}
+    keys = list(members)
     stats = []
     for _ in range(n_boot):
-        idx = rng.integers(0, len(y), len(y))
+        pick = rng.integers(0, len(keys), len(keys))
+        idx = np.concatenate([members[keys[i]] for i in pick])
         if len(np.unique(y[idx])) < 2:
             continue
         stats.append(roc_auc_score(y[idx], p[idx]))
@@ -57,23 +74,41 @@ def bootstrap_auroc_ci(y: np.ndarray, p: np.ndarray, n_boot: int = N_BOOT, seed:
     return float(lo), float(hi)
 
 
-def main() -> None:
-    df = pd.read_csv(DATA)
-    n_excluded = int(df["label"].isna().sum())
-    df = df.dropna(subset=["label"]).reset_index(drop=True)
-    X, y, groups = df[FEATURES].to_numpy(), df["label"].astype(int).to_numpy(), df["person_id"].to_numpy()
-
+def evaluate(df: pd.DataFrame, group_col: str) -> dict:
+    """Leave-one-group-out validation; returns pooled held-out AUROC with a group bootstrap CI."""
+    X, y, groups = df[FEATURES].to_numpy(), df["label"].astype(int).to_numpy(), df[group_col].to_numpy()
     oof = np.zeros(len(df))
     for train, test in LeaveOneGroupOut().split(X, y, groups):
-        m = make_model().fit(X[train], y[train])
-        oof[test] = m.predict_proba(X[test])[:, 1]
-
-    auroc = float(roc_auc_score(y, oof))
-    lo, hi = bootstrap_auroc_ci(y, oof)
+        oof[test] = make_model().fit(X[train], y[train]).predict_proba(X[test])[:, 1]
+    lo, hi = bootstrap_auroc_ci(y, oof, groups)
     pred = oof >= 0.5
-    sens = float(pred[y == 1].mean())
-    spec = float((~pred[y == 0]).mean())
+    return {
+        "n_recordings": int(len(df)),
+        "n_groups": int(len(np.unique(groups))),
+        "n_apnea": int((y == 1).sum()),
+        "n_control": int((y == 0).sum()),
+        "auroc": round(float(roc_auc_score(y, oof)), 3),
+        "auroc_ci95": [round(lo, 3), round(hi, 3)],
+        "sensitivity_at_0.5": round(float(pred[y == 1].mean()), 3),
+        "specificity_at_0.5": round(float((~pred[y == 0]).mean()), 3),
+    }
 
+
+def main() -> None:
+    df = pd.read_csv(DATA)
+    assert_real_data(df, DATA)
+    n_excluded = int(df["label"].isna().sum())
+    df = df.dropna(subset=["label"]).reset_index(drop=True)
+    learning = df[df["record_set"] == "learning"].reset_index(drop=True)
+
+    main_eval = evaluate(df, "subject_id")
+    comparison = {
+        "learning_set_by_recording_previous_method": evaluate(learning, "person_id"),
+        "learning_set_by_subject": evaluate(learning, "subject_id"),
+        "all_usable_by_recording": evaluate(df, "person_id"),
+    }
+
+    X, y = df[FEATURES].to_numpy(), df["label"].astype(int).to_numpy()
     model = make_model().fit(X, y)
     coefs = dict(zip(FEATURES, (float(c) for c in model[-1].coef_[0])))
 
@@ -82,17 +117,14 @@ def main() -> None:
 
     metrics = {
         "model": "StandardScaler + LogisticRegression(C=1.0, class_weight=balanced)",
-        "dataset": "PhysioNet Apnea-ECG 1.0.0 learning set (real recordings only)",
-        "validation": "leave-one-person-out (one recording per person)",
-        "n_recordings": int(len(df)),
-        "n_apnea": int((y == 1).sum()),
-        "n_control": int((y == 0).sum()),
+        "dataset": "PhysioNet Apnea-ECG 1.0.0, learning and test sets (real recordings only)",
+        "validation": "leave-one-subject-out; all recordings of one person are held out together",
+        "subject_grouping": "inferred from identical age, sex, height and weight in additional-information.txt",
+        "class_definition": "apnea minutes >= 100 is apnea, < 5 is control, otherwise borderline (excluded)",
+        **main_eval,
         "n_borderline_excluded": n_excluded,
-        "auroc": round(auroc, 3),
-        "auroc_ci95": [round(lo, 3), round(hi, 3)],
-        "ci_method": f"percentile bootstrap over recordings, {N_BOOT} resamples, seed {SEED}",
-        "sensitivity_at_0.5": round(sens, 3),
-        "specificity_at_0.5": round(spec, 3),
+        "ci_method": f"percentile bootstrap resampling subjects, {N_BOOT} resamples, seed {SEED}",
+        "comparison": comparison,
         "features": FEATURES,
         "standardized_coefficients": {k: round(v, 3) for k, v in coefs.items()},
         "limitations": LIMITATIONS,
