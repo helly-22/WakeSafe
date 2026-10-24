@@ -1,13 +1,13 @@
 """Train and validate the heart-rate/HRV apnea screening model.
 
-Trains on data/processed/apnea_ecg_nights.csv only (real Apnea-ECG recordings).
+Trains on ml/data/processed/apnea_ecg_nights.csv only (real Apnea-ECG recordings).
 Never reads or trains on synthetic data. Borderline (group b) recordings are excluded.
 
 Validation is leave-one-person-out. Each recording is a different person, so this
 is leave-one-out over recordings. AUROC comes from the pooled held-out predictions,
 with a bootstrap 95% confidence interval over recordings.
 
-Usage: python training/train_apnea_model.py
+Usage: python ml/training/train_apnea_model.py
 """
 from __future__ import annotations
 
@@ -24,9 +24,9 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 FEATURES = ["mean_hr_bpm", "resting_hr_bpm", "hrv_rmssd_ms", "sdnn_ms", "hr_minute_sd_bpm"]
-DATA = Path("data/processed/apnea_ecg_nights.csv")
-MODEL_PATH = Path("models/apnea_hr_hrv.joblib")
-METRICS_PATH = Path("models/metrics.json")
+DATA = Path("ml/data/processed/apnea_ecg_nights.csv")
+MODEL_PATH = Path("ml/models/apnea_hr_hrv.joblib")
+METRICS_PATH = Path("backend/app/ml/metrics.json")
 N_BOOT = 2000
 SEED = 0
 

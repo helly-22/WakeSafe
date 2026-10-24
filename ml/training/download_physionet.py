@@ -1,6 +1,6 @@
 """Download an open PhysioNet dataset using its SHA256SUMS.txt manifest.
 
-Usage: python training/download_physionet.py apnea-ecg 1.0.0 data/raw/apnea-ecg [regex]
+Usage: python ml/training/download_physionet.py apnea-ecg 1.0.0 ml/data/raw/apnea-ecg [regex]
 
 The optional regex keeps only manifest paths that match it (re.search).
 

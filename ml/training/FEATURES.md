@@ -1,6 +1,6 @@
 # Apnea-ECG nightly features
 
-Produced by `training/extract_features.py` into `data/processed/apnea_ecg_nights.csv`, one row per
+Produced by `ml/training/extract_features.py` into `ml/data/processed/apnea_ecg_nights.csv`, one row per
 real recording from PhysioNet Apnea-ECG 1.0.0 (learning set: a01 to a20, b01 to b05, c01 to c10, 35 recordings).
 No synthetic data is used. WakeSafe is a screening aid, not a diagnosis.
 
@@ -48,4 +48,4 @@ Training uses only the wearable-style columns: `mean_hr_bpm`, `resting_hr_bpm`, 
 
 ## Limits
 
-These come from clinical ECG, not from a wrist device. See `models/metrics.json` for the domain-shift statement.
+These come from clinical ECG, not from a wrist device. See `backend/app/ml/metrics.json` for the domain-shift statement.

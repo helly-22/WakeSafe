@@ -1,14 +1,14 @@
 """Extract WakeSafe-style nightly summaries from the real Apnea-ECG recordings.
 
-Input:  data/raw/apnea-ecg/ (PhysioNet Apnea-ECG 1.0.0, learning set a01..c10)
-Output: data/processed/apnea_ecg_nights.csv, one row per recording.
+Input:  ml/data/raw/apnea-ecg/ (PhysioNet Apnea-ECG 1.0.0, learning set a01..c10)
+Output: ml/data/processed/apnea_ecg_nights.csv, one row per recording.
 
 Only real recordings are read. Synthetic data is never used here.
 Beat times come from the .qrs annotations when present, otherwise R peaks are
 detected from the ECG in the .dat file. Minute-level apnea labels come from .apn.
-See training/FEATURES.md for every column.
+See ml/training/FEATURES.md for every column.
 
-Usage: python training/extract_features.py [--raw DIR] [--out CSV]
+Usage: python ml/training/extract_features.py [--raw DIR] [--out CSV]
 """
 from __future__ import annotations
 
@@ -124,8 +124,8 @@ def list_records(raw_dir: Path) -> list[str]:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--raw", default="data/raw/apnea-ecg")
-    ap.add_argument("--out", default="data/processed/apnea_ecg_nights.csv")
+    ap.add_argument("--raw", default="ml/data/raw/apnea-ecg")
+    ap.add_argument("--out", default="ml/data/processed/apnea_ecg_nights.csv")
     args = ap.parse_args()
 
     raw_dir = Path(args.raw)

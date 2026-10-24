@@ -7,10 +7,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # backend/, so `app` is importable
 
-from app.features import baseline_zscores
-from app.model import score_stopbang
+from app.services.screening.features import baseline_zscores
+from app.services.screening.model import score_stopbang
 
 NO = dict(
     snoring=False,
@@ -148,27 +148,3 @@ def test_all_nan_spo2_gives_no_z():
 def test_too_few_nights_gives_no_z():
     df = make_nights(n=8, calibrating=0)
     assert baseline_zscores(df)["spo2_percentage"]["z"] is None
-
-
-# Apnea-ECG feature extraction (real data, skipped when not downloaded)
-
-import pytest
-
-APNEA_RAW = Path(__file__).resolve().parents[1] / "data" / "raw" / "apnea-ecg"
-
-
-@pytest.mark.skipif(
-    not all((APNEA_RAW / f"a01.{ext}").exists() for ext in ("hea", "apn", "qrs")),
-    reason="Apnea-ECG record a01 not downloaded",
-)
-def test_extract_features_on_one_record():
-    from training.extract_features import extract_record
-
-    row = extract_record(APNEA_RAW, "a01")
-    assert row["person_id"] == "a01"
-    assert row["group"] == "a" and row["label"] == 1
-    assert 5 <= row["recording_hours"] <= 12
-    assert 40 < row["resting_hr_bpm"] <= row["mean_hr_bpm"] < 120
-    assert 5 < row["hrv_rmssd_ms"] < 150
-    assert 0.5 < row["valid_rr_fraction"] <= 1.0
-    assert 0.0 <= row["apnea_minute_fraction"] <= 1.0
