@@ -2,7 +2,7 @@
 
 Produced by `ml/training/extract_features.py` into `ml/data/processed/apnea_ecg_nights.csv`, one row per
 real recording from PhysioNet Apnea-ECG 1.0.0: the learning set (a01 to c10, 35 recordings) and the test set (x01 to x35, 35 recordings),
-70 in all, from 32 people. No synthetic data is used. WakeSafe is a screening aid, not a diagnosis.
+70 in all, from 32 people. No synthetic data is used. Screening aid only.
 
 ## Source files per record
 

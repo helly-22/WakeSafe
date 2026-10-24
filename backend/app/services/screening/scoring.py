@@ -1,6 +1,6 @@
 """Rule-based apnea screening tier for WakeSafe (Person A).
 
-Pure functions, no schema imports. This is a screening aid, not a diagnosis.
+Pure functions, no schema imports. Screening aid only.
 
 The STOP-Bang questionnaire tier is the base. Wearable evidence can raise it by at most
 one level and can never lower it. Evidence is a set of "signals" that either fire or not:

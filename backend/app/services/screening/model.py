@@ -1,6 +1,6 @@
 """Screening models for WakeSafe (Person A).
 
-This is a screening aid, not a diagnosis. For now this file holds the STOP-Bang
+Screening aid only. This file holds the STOP-Bang
 questionnaire score and the runtime apnea model scorer. Tier logic is in scoring.py.
 """
 from __future__ import annotations

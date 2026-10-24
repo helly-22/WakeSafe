@@ -1,6 +1,6 @@
 """Nightly features and personal baselines for WakeSafe (Person A).
 
-This is a screening aid, not a diagnosis. Trends against a person's own earlier
+Screening aid only. Trends against a person's own earlier
 nights are more trustworthy from a wrist device than absolute values.
 """
 from __future__ import annotations

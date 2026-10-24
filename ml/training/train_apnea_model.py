@@ -53,7 +53,8 @@ RUNTIME_LIMITATIONS = (
     "from a published subject key. "
     "4) Output probabilities are not calibrated and must not be shown as a percentage. "
     "The sample is small and the confidence interval is wide. "
-    "WakeSafe is a screening aid, not a diagnosis."
+    "WakeSafe is a screening aid, not a diagnosis. Results come from wearable-style data and "
+    "self-reported history, and must be confirmed by a clinician."
 )
 
 ECG_LIMITATIONS = (
