@@ -86,7 +86,23 @@ def test_live_fetch_builds_live_nudges_with_as_of():
 
 
 # --- cached fallback path ----------------------------------------------------
-def test_fetch_failure_falls_back_to_cached_labeled():
+def test_fetch_failure_falls_back_to_cached_labeled(tmp_path, monkeypatch):
+    # The real cache lives in ml/data/raw/ (gitignored), so give the service a small one of its own.
+    resp_csv = tmp_path / "resp.csv"
+    resp_csv.write_text(
+        "week_end,pathogen,percent_test_positivity\n"
+        "2026-10-10T00:00:00.000,Influenza,3.0\n"
+        "2026-10-17T00:00:00.000,Influenza,3.5\n"
+        "2026-10-17T00:00:00.000,RSV,2.0\n"
+    )
+    flu_csv = tmp_path / "flu.csv"
+    flu_csv.write_text(
+        "week_ending,state,activity_level_label\n"
+        "2026-10-17T00:00:00.000,Massachusetts,Minimal\n"
+    )
+    monkeypatch.setattr(nudge_service, "_RESP_CSV", resp_csv)
+    monkeypatch.setattr(nudge_service, "_FLUVIEW_CSV", flu_csv)
+
     def _boom(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("simulated live outage")
 
@@ -102,7 +118,7 @@ def test_fetch_failure_falls_back_to_cached_labeled():
     # the fallback must say, honestly, that it is cached
     assert any("cached" in note.lower() for note in bundle.notes)
     # an honest as-of date still comes through from the cached CSV
-    assert bundle.as_of != "unknown"
+    assert bundle.as_of == "2026-10-17"
 
 
 # --- tone guarantees ---------------------------------------------------------
