@@ -236,7 +236,11 @@ def decide_apnea_tier(
         "Not a clinical prediction."
     )
     if not wearable_used:
-        note += " No usable wearable data, so the tier reflects the questionnaire only."
+        if not enough_nights:
+            why = f"only {nights_available} nights were available and at least {cfg['min_nights']} are needed"
+        else:
+            why = "the readings it needs were missing"
+        note += f" Wearable data was not used because {why}, so the tier reflects the questionnaire only."
     if synthetic:
         note += " Synthetic demonstration data."
 
