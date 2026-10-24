@@ -62,7 +62,9 @@ def test_other_risks_are_unchanged_by_the_gate(worsening):
     profile, nights = worsening
     male = run_screen(profile.model_copy(update={"sex": "male"}), nights)[2]
     female = run_screen(profile.model_copy(update={"sex": "female"}), nights)[2]
-    keep = lambda a: [(r.risk_id, r.tier, r.reasons) for r in a.risks if r.risk_id != "menopause"]
+    # Sleep-disordered breathing is left out on purpose: STOP-Bang gives male sex a point, so it can differ.
+    skip = {"menopause", "sleep_disordered_breathing"}
+    keep = lambda a: [(r.risk_id, r.tier, r.reasons) for r in a.risks if r.risk_id not in skip]
     assert keep(male) == keep(female)
 
 

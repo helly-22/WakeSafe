@@ -92,9 +92,9 @@ def test_two_signals_raise_one_level_with_reasons_and_numbers():
 
 
 def test_model_plus_one_trend_raises_moderate_to_high_when_counted():
-    d = run("Moderate", values=RISKY_VALUES, z={"disturbance_count": 2.5}, config=MODEL_COUNTS)
+    d = run("Moderate", values=RISKY_VALUES, z={"respiratory_rate_rpm": 2.5}, config=MODEL_COUNTS)
     assert d.tier == "High" and d.raised
-    assert set(d.signals_fired) == {"model", "disturbance_count"}
+    assert set(d.signals_fired) == {"model", "respiratory_rate_rpm"}
 
 
 def test_all_signals_raise_only_one_level():
@@ -216,3 +216,22 @@ def test_hypertension_in_conditions_counts_and_is_listed():
     assert d2.stop_bang_score == 1 and not any("counted from the reported conditions" in f for f in d2.top_factors)
     # unrelated conditions change nothing
     assert run("Low", hypertension=None, conditions=["asthma"]).stop_bang_score == 0
+
+
+def test_signals_that_are_not_about_breathing_cannot_raise_the_tier_alone():
+    # Disturbances and low sleep efficiency also follow menopause, illness and travel.
+    d = run("Low", z={"disturbance_count": 3.5, "sleep_efficiency_pct": -2.8})
+    assert d.tier == "Low" and not d.raised
+    assert set(d.signals_fired) == {"disturbance_count", "sleep_efficiency_pct"}
+    assert any("none is a breathing signal" in f and "stays Low" in f for f in d.top_factors)
+
+
+def test_one_breathing_signal_plus_one_other_still_raises():
+    for breathing in ({"spo2_pct": -1.5}, {"respiratory_rate_rpm": 1.5}):
+        d = run("Low", z={**breathing, "disturbance_count": 1.5})
+        assert d.tier == "Moderate" and d.raised and len(d.signals_fired) == 2
+
+
+def test_the_breathing_requirement_is_in_the_config_and_the_evidence_note():
+    assert CONFIG["breathing_signals"] == ("spo2_pct", "respiratory_rate_rpm")
+    assert "at least one breathing signal (SpO2 or respiratory rate)" in run("Low").evidence_note

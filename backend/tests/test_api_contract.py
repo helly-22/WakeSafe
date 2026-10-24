@@ -123,3 +123,11 @@ def test_report_preview_and_pdf_not_built():
     report = ClinicianReportData.model_validate(r.json())
     assert report.explanations is not None and report.data_provenance == ["synthetic"] and len(report.nights) > 15
     assert client.post("/api/reports/pdf").status_code == 501
+
+
+def test_menopause_pattern_scenario_is_not_escalated_as_apnea():
+    # Its changes are in disturbances and sleep efficiency only (no SpO2 or breathing-rate change).
+    d = analyze(persona_id="SYN-MENOPAUSE").json()
+    assert d["apnea_score"]["tier"] == "Low"
+    risks = {r["risk_id"]: r["tier"] for r in d["risk_assessment"]["risks"]}
+    assert risks["menopause"] != "Low" and risks["sleep_disordered_breathing"] != "High"
