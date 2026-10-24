@@ -2,41 +2,54 @@
 
 > Hackachusetts submission
 
-WakeSafe pulls sleep and biometric data from a user's [WHOOP](https://www.whoop.com/)
-wearable, analyzes it for signs of **sleep apnea**, and surfaces findings through a
-conversational chat interface (e.g. `/chat/sleep-apnea-flagging-with-whoop`).
+WakeSafe uses wearable-style sleep and recovery summaries (in
+[WHOOP](https://www.whoop.com/) format) plus user-reported history to surface
+**screening risks**, including sleep apnea risk, and to suggest appropriate care
+navigation. It is a screening aid only, not a diagnostic tool.
+
+The default demo runs on **synthetic** WHOOP-format data. Live WHOOP OAuth is optional.
+See [`TEAM_CONTRACTS.md`](TEAM_CONTRACTS.md) for ownership, interfaces and safety rules.
 
 ## What it does
 
-- **Ingests WHOOP data** — connects via the WHOOP OAuth API to pull sleep, recovery,
-  heart rate, and SpO2 metrics.
-- **Flags sleep apnea risk** — runs the biometric time-series through detection logic /
-  an ML model to surface apnea indicators (e.g. SpO2 dips, respiratory disturbances,
-  fragmented sleep).
-- **Explains results via chat** — a chat UI lets users ask about their flags and sleep
-  trends in plain language.
+- **Loads sleep data** — synthetic demo personas by default, CSV upload, or optional
+  live WHOOP data via OAuth (sleep, recovery, heart rate, SpO2).
+- **Screens for apnea risk** — combines STOP-Bang-style intake with a model trained on
+  open sleep-study datasets to give a Low / Moderate / High screening tier.
+- **Assesses risks and matches care** — rule-based risk tiers with an emergency
+  override for red-flag symptoms, plus ranked care options (capacity is labeled
+  static, simulated, live or unknown).
+- **Explains and reports** — plain-language explanations of structured results and a
+  downloadable clinician PDF report.
 
 ## Repository layout
 
 ```
 WakeSafe/
-├── backend/            # FastAPI service: WHOOP integration, apnea detection, chat API
+├── backend/            # FastAPI service: data providers, screening, risks, care, reports
 │   ├── app/
-│   │   ├── api/        # HTTP routes (chat, whoop auth, analysis, health)
+│   │   ├── api/        # Thin FastAPI route handlers
 │   │   ├── core/       # Config, settings, security, logging
-│   │   ├── models/     # Pydantic + DB models (schemas, ORM)
-│   │   ├── services/   # Business logic (WHOOP client, apnea analysis, chat)
-│   │   ├── ml/         # Sleep-apnea detection models + feature engineering
-│   │   ├── db/         # Database session, migrations, repositories
+│   │   ├── models/     # Shared Pydantic request/response schemas
+│   │   ├── ml/         # Small approved runtime model artifact + metadata
+│   │   ├── data/       # Runtime reference data (hospitals.csv)
+│   │   ├── services/
+│   │   │   ├── whoop/         # Synthetic / CSV / optional WHOOP data providers
+│   │   │   ├── screening/     # Runtime features + apnea model inference
+│   │   │   ├── risks/         # Rule-based risk assessment
+│   │   │   ├── care/          # Facility matching and ranking
+│   │   │   ├── explanations/  # Guarded plain-language explanations
+│   │   │   └── reports/       # Clinician report data + PDF rendering
+│   │   ├── db/         # Unused unless persistence is deliberately added
 │   │   └── utils/      # Shared helpers
 │   └── tests/
-├── frontend/           # React + TypeScript app: chat interface + dashboard
+├── frontend/           # React + TypeScript app: intake, dashboard, care map, report
 │   └── src/
-│       ├── components/ # Reusable UI (chat bubbles, charts, cards)
-│       ├── pages/      # Route-level views (chat, dashboard, auth callback)
-│       ├── features/   # Feature slices (chat, whoop, analysis)
+│       ├── components/ # Reusable UI (charts, cards, banners)
+│       ├── pages/      # Route-level views
+│       ├── features/   # Feature slices (intake, risks, care, report)
 │       ├── hooks/      # Custom React hooks
-│       ├── services/   # API clients
+│       ├── services/   # Typed API client
 │       ├── lib/        # Utilities, types, constants
 │       └── assets/     # Images, icons, styles
 ├── ml/                 # Standalone ML: notebooks, training, datasets, saved models
@@ -46,9 +59,11 @@ WakeSafe/
 │   └── training/       # Training + evaluation scripts
 ├── infra/              # Deployment: docker, compose, env templates, CI helpers
 ├── docs/               # Architecture notes, API docs, design decisions
-└── scripts/            # Dev/ops scripts (setup, seed, run)
+├── scripts/            # Dev/ops scripts (setup, seed, run)
+├── slides/             # Pitch materials
+└── TEAM_CONTRACTS.md   # Ownership, interfaces and safety rules
 ```
 
 ## Getting started
 
-See [`docs/SETUP.md`](docs/SETUP.md) once dependencies are added.
+Setup instructions will be added to `docs/SETUP.md` once dependencies are in place.
