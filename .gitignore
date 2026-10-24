@@ -1,0 +1,13 @@
+.env
+
+data/raw/
+
+.venv/
+
+__pycache__/
+
+data/processed/
+
+models/*.joblib
+
+.pytest_cache/
