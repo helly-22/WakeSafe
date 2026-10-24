@@ -18,6 +18,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.contract_routes import router as contract_router
 from app.api.routes import router
 
 app = FastAPI(
@@ -39,6 +40,7 @@ app.add_middleware(
 )
 
 app.include_router(router)
+app.include_router(contract_router)
 
 
 @app.get("/")
@@ -56,5 +58,13 @@ def root() -> dict:
             "/explain",
             "/report",
             "/demo/{persona}",
+        ],
+        "contract_endpoints": [
+            "/api/health",
+            "/api/demo/personas",
+            "/api/screening/analyze",
+            "/api/care/recommendations",
+            "/api/reports/preview",
+            "/api/reports/pdf",
         ],
     }

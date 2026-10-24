@@ -63,9 +63,13 @@ export function formatSeriesValue(def: SeriesDef, v: number | null | undefined):
   return def.unit === '%' || def.unit === '°C' ? `${n}${def.unit}` : `${n} ${def.unit}`;
 }
 
-/** Window average from the FeatureSet (placeholder `<field>_mean` naming, see metrics.ts). */
+/**
+ * Window average from the FeatureSet. compute_features names each recent-window mean after the
+ * NightRecord field (for example `spo2_pct`); the older `<field>_mean` placeholder still works
+ * for the mock fixtures.
+ */
 export function windowMean(features: FeatureSet, key: NightMetricKey): number | null {
-  return features.values[meanFeatureKey(key)] ?? null;
+  return features.values[key] ?? features.values[meanFeatureKey(key)] ?? null;
 }
 
 export function nightValues(nights: NightRecord[], key: NightMetricKey): Array<number | null> {

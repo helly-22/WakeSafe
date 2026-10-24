@@ -72,7 +72,6 @@ def screen(body: ScreenRequest) -> ScreenResponse:
 
 
 @router.post("/care", response_model=CareRecommendations)
-@router.post("/api/care/recommendations", response_model=CareRecommendations)
 def care(body: CareRequest) -> CareRecommendations:
     """A risk assessment + current location -> ranked facilities."""
     return recommend_care(

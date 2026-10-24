@@ -243,3 +243,19 @@ def test_live_whoop_fails_clearly_without_credentials():
 def test_no_backend_code_reads_the_answer_key():
     offenders = [p for p in (BACKEND / "app").rglob("*.py") if "ground_truth" in p.read_text()]
     assert offenders == []
+
+
+# single-person upload samples (nights_sample.csv holds two people and is not meant for upload)
+
+
+@pytest.mark.parametrize("pid", ["P001", "P002"])
+def test_single_person_upload_samples_load_through_the_csv_provider(pid):
+    path = REPO / "fixtures" / f"nights_sample_{pid}.csv"
+    assert path.read_text().startswith("# SYNTHETIC DATA")
+    nights = load_nights("csv", csv_file=str(path))
+    assert len(nights) == 14 and all(n.source == "csv" and n.night_id.startswith(pid) for n in nights)
+
+
+def test_the_two_person_sample_is_rejected_with_a_clear_message():
+    with pytest.raises(ProviderDataError, match="2 different people"):
+        load_nights("csv", csv_file=str(SAMPLE))

@@ -453,6 +453,16 @@ def _score_group(
     apnea: ApneaScore,
     quality_flags: list[str],
 ) -> _GroupScore:
+    # Menopause does not apply to a male profile. Unknown or other sex answers still score, so a
+    # profile with no intake answers (the demo scenarios) is unaffected.
+    if group == "menopause" and _is_male(profile.sex):
+        return _GroupScore(
+            points=0.0,
+            reasons=["Not applicable: menopause screening is not applied to a male profile."],
+            sources={"patient_reported"},
+            travel_softened=False,
+        )
+
     reasons: list[str] = []
     sources: set[SourceLabel] = set()
     points = 0.0

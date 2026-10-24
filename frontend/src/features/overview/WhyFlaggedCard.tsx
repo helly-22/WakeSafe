@@ -1,5 +1,6 @@
 import { SourceTags } from '../../components/Badges';
 import { Card } from '../../components/Card';
+import { stripEvidence } from '../../lib/format';
 import type { AnalyzeResponse } from '../../lib/types';
 
 /**
@@ -20,7 +21,9 @@ export function WhyFlaggedCard({ data, className }: { data: AnalyzeResponse; cla
                   <span className={`tier-mark tier-mark--${risk.tier.toLowerCase()}`}>{risk.tier}</span>
                   <h4 className="risk-explanations__name">{risk.display_name}</h4>
                 </div>
-                {explanation.risk_explanations[risk.risk_id] && <p className="lead">{explanation.risk_explanations[risk.risk_id]}</p>}
+                {stripEvidence(explanation.risk_explanations[risk.risk_id] ?? '') && (
+                  <p className="lead">{stripEvidence(explanation.risk_explanations[risk.risk_id] ?? '')}</p>
+                )}
                 <ul className="reasons">
                   {risk.reasons.map((r) => (
                     <li key={r}>{r}</li>

@@ -69,3 +69,11 @@ export function series(nights: NightRecord[], key: NightMetricKey): Array<number
 export function countPresent(nights: NightRecord[], key: NightMetricKey): number {
   return nights.filter((n) => n[key] !== null).length;
 }
+
+/**
+ * The explanation engine puts a machine-readable `[EVIDENCE]{...}[/EVIDENCE]` block (chart data)
+ * in front of each risk explanation's plain text. Show only the plain text.
+ */
+export function stripEvidence(text: string): string {
+  return text.replace(/\[EVIDENCE\][\s\S]*?\[\/EVIDENCE\]\s*/g, '').trim();
+}
