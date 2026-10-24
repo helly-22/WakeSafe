@@ -8,7 +8,7 @@
   "personas": [
     {
       "persona_id": "SYN-NORMAL",
-      "nights": 7,
+      "nights": 14,
       "travel_nights": 0
     },
     {
@@ -23,7 +23,7 @@
     },
     {
       "persona_id": "SYN-CARDIO",
-      "nights": 10,
+      "nights": 14,
       "travel_nights": 0
     },
     {

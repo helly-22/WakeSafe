@@ -141,7 +141,7 @@ def _days(n: int) -> list[date]:
     return [START_DATE + timedelta(days=i) for i in range(n)]
 
 
-def make_normal(rng: random.Random, nights: int = 7) -> Persona:
+def make_normal(rng: random.Random, nights: int = 14) -> Persona:
     """Healthy person, stable near baseline. Drives no risk -> Low tier."""
     pid = "SYN-NORMAL"
     recs = [_night(rng, pid, d) for d in _days(nights)]
@@ -230,7 +230,7 @@ def make_menopause(rng: random.Random, baseline_nights: int = 7, recent_nights: 
     )
 
 
-def make_cardiovascular(rng: random.Random, nights: int = 10) -> Persona:
+def make_cardiovascular(rng: random.Random, nights: int = 14) -> Persona:
     """Cardiovascular drift over the window: resting HR rises, HRV falls."""
     pid = "SYN-CARDIO"
     recs: list[NightRecord] = []
