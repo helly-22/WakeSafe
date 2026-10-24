@@ -24,12 +24,13 @@ All demo data in this repository is **synthetic** (made up). No real patient dat
 8. [Repository layout and who owns what](#8-repository-layout)
 9. [Tests](#9-tests)
 10. [What is not built yet](#10-what-is-not-built-yet)
+11. [Future work](#11-future-work)
 
 ---
 
 ## 1. What you can do in the app
 
-The app has five pages: **Overview**, **Sleep Trends**, **Health Intake**, **Find Care** and **My Report**. A "demo person" picker at the top right lets you try 72 made-up people (see [section 4](#4-the-data)).
+The app has five pages: **Overview**, **Sleep Trends**, **Health Intake**, **Find Care** and **My Report**. A picker at the top right lets you try 72 made-up people, each with a made-up name ending in "(synthetic)" (see [section 4](#4-the-data)).
 
 ### Overview: your result at a glance
 
@@ -165,11 +166,15 @@ All thresholds live in one settings block (`CONFIG` in `backend/app/services/scr
 
 | Group | How many | What they are |
 | --- | --- | --- |
-| P001 to P065 | 65 | Made-up people with about 30 nights each and made-up questionnaire answers, built by `synthetic_data/` (seed 42, so identical every run). They deliberately overlap, so it is not obvious who is who. |
+| P001 to P065 | 65 | Made-up people with about 30 nights each and made-up questionnaire answers, built by `synthetic_data/` (seed 42, so identical every run). They deliberately overlap, so it is not obvious who is who. Each has a random but fixed made-up name (for example "Nikhil Ortega (synthetic)") that matches the sex in their answers and is never based on health condition. |
 | P901 | 1 | A demo-only person whose **last 7 nights get worse** (lower SpO2 and efficiency, more disturbances). It shows the app reacting to change. |
 | Demo scenarios | 6 | Normal sleeper, apnea pattern, cardiovascular drift, peri/menopause pattern, altitude trip and jet-lag trip, built by `scripts/gen_synthetic.py`. The last two show travel being taken into account. |
 
 Every synthetic file starts with a `# SYNTHETIC DATA` line and has an `is_synthetic` column.
+
+![Health Intake: the demo people with their made-up names](docs/screenshots/12-intake-all-profiles.png)
+
+The demo people appear with their made-up names, a "(synthetic)" label and a "Demo" badge on their wearable data, so nobody can mistake them for real patients. Their IDs (P001 and so on) are used in the API and in the tests.
 
 **Synthetic data is only used to run the demo, build the screens and test the code.** It is never used to train, tune or measure accuracy of any model.
 
@@ -239,7 +244,7 @@ Open http://localhost:5173. Without those two settings the website runs on its o
 
 1. Open the **Overview** and pick a demo person from the top right.
 2. Open **Health Intake**, answer the questionnaire and save. The Overview re-screens with your answers.
-3. Pick **P012** to see the emergency banner, or **Demo altitude trip** to see travel being taken into account.
+3. Pick **Gideon Jensen (synthetic)** (ID P012) to see the emergency banner, or **Demo altitude trip (SpO2 suppressed)** to see travel being taken into account.
 
 ### Regenerating data (optional)
 
@@ -318,7 +323,7 @@ WakeSafe/
 
 | Suite | How to run | Status |
 | --- | --- | --- |
-| Backend (208) | `cd backend && python -m pytest -q` | all pass |
+| Backend (209) | `cd backend && python -m pytest -q` | all pass |
 | ML and scripts | `python -m pytest ml/tests scripts/tests -q` | 24 pass, 3 skipped (they need the downloaded recordings) |
 | Synthetic data (45) | `cd synthetic_data && python -m pytest -q` | all pass, validator 10 of 10 checks |
 | Frontend (45) | `cd frontend && npm test` | all pass, `npm run build` succeeds |
@@ -337,6 +342,30 @@ Run the backend tests from the `backend/` folder. The tests cover the data provi
 - **Cloud storage.** Questionnaire answers stay on the device. The Supabase migration and adapter are prepared but not connected, and the team still has to decide whether health answers should be stored at all.
 - **Clinician review.** Every threshold in the rules is marked unreviewed and needs a clinician's check before real use.
 - **A prospective check on real WHOOP data.** Nothing here has been tested on real people.
+
+---
+
+## 11. Future work
+
+Where we want to take WakeSafe next. Each item says what exists today and what is missing.
+
+### Doctor-ready reports
+
+When the screener flags a risk, generate a clear report of the underlying metrics (sleep stages, heart rate, oxygen and trend data) and the person's relevant history, so they can bring it to a doctor and the doctor can analyze it quickly.
+
+*Today:* the structured report data is built and served (`POST /api/reports/preview`), including the nights, features, reasons, versions and data provenance. *Next:* the **My Report** page, a printable PDF with trend charts and a nightly-values appendix, and a preview step before anything is downloaded, with name and date of birth optional.
+
+### Smarter hospital matching
+
+Recommend nearby hospitals with a specialty matched to the specific condition, ranked by urgency. For urgent cases, prioritize proximity and available capacity. For routine cases, weigh wait time and specialty fit, using live wait-time and bed-availability data from each hospital.
+
+*Today:* 20 Massachusetts hospitals are ranked by specialty fit and drive time, with a driving route on the map, and capacity is labeled static, simulated, live or unknown. The live-capacity slot exists but is a stub. *Next:* real condition-to-specialty data (the current hospital list describes beds and services, not sleep clinics or cardiology), live wait-time and bed-availability feeds, and separate ranking rules for urgent and routine cases.
+
+### Richer inputs and broader screening
+
+Combine WHOOP data with additional sources, such as lab results and medical history, to improve the accuracy of our flagging. Use the same signals to screen for other cardiac issues, such as irregular heart rhythms, alongside sleep apnea.
+
+*Today:* the inputs are WHOOP-format nightly summaries (demo people or CSV upload) plus an 11-question questionnaire, and the risk engine already has a cardiovascular group based on heart-rate and HRV trends. *Next:* the live WHOOP connection with member consent, a way to add lab results and fuller history, and heart-rhythm screening. Like everything in WakeSafe, a new screening signal would need validation on real recordings, a clinician's review and an honest statement of its limits before anyone relies on it.
 
 ---
 
