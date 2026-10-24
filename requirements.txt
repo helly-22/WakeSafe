@@ -7,3 +7,6 @@ pytest
 joblib
 pydantic
 pyyaml
+fastapi
+uvicorn
+httpx
