@@ -6,6 +6,7 @@ listed in DEMO_FIXTURE_FILES under fixtures/, when those files exist.
 """
 from __future__ import annotations
 
+import random
 from pathlib import Path
 from typing import TypedDict
 
@@ -51,11 +52,67 @@ def _synthetic_frame(directory: Path) -> pd.DataFrame:
     return sleep.merge(recovery, on=["person_id", "date"], how="left")
 
 
+# Made-up names for the demo people. They are random but fixed (a seeded shuffle), match the sex in
+# each person's intake answers, and never depend on health condition. Every name carries "(synthetic)".
+_FEMALE_NAMES = [
+    "Priya", "Elena", "Grace", "Noor", "Camila", "Hannah", "Ingrid", "Leila", "Marta", "Nia", "Olivia",
+    "Paloma", "Rhea", "Sofia", "Tara", "Uma", "Vera", "Wren", "Yuki", "Zoe", "Amara", "Beatrice", "Chloe",
+    "Daria", "Esme", "Fatima", "Gwen", "Hana", "Isla", "Jana", "Keiko", "Lucia", "Mira", "Nadia", "Oona",
+    "Petra", "Selma", "Talia",
+]
+_MALE_NAMES = [
+    "Aarav", "Bruno", "Carlos", "Dmitri", "Elijah", "Felix", "Gabriel", "Hugo", "Ivan", "Jamal", "Kenji",
+    "Liam", "Mateo", "Nikhil", "Omar", "Pavel", "Rafael", "Samuel", "Tomas", "Victor", "Wei", "Yusuf",
+    "Zane", "Andre", "Benji", "Caleb", "Dev", "Emil", "Farid", "Gideon", "Hector", "Idris", "Jonas",
+    "Kwame", "Lars", "Malik", "Nolan", "Oscar", "Pedro", "Quentin", "Ravi", "Stefan", "Theo", "Umar",
+]
+_SURNAMES = [
+    "Okafor", "Lindqvist", "Moreau", "Tanaka", "Brennan", "Castillo", "Dubois", "Ellison", "Fontaine",
+    "Gallagher", "Hartmann", "Ivanov", "Jensen", "Kowalski", "Lambert", "Marchetti", "Novak", "Ortega",
+    "Petrov", "Quintero", "Reyes", "Santoro", "Thornton", "Underwood", "Vasquez", "Whitfield", "Xu",
+    "Yamamoto", "Zielinski", "Abara", "Banerjee", "Carvalho", "Delgado", "Eriksen", "Fischer", "Grayson",
+    "Holloway", "Iyer", "Jimenez", "Kaplan", "Larsen", "Mendoza", "Nakamura", "Oliveira", "Patel",
+    "Quigley", "Rasmussen", "Sullivan", "Tremblay", "Ueda", "Vargas", "Walsh", "Yilmaz", "Zhang",
+    "Adeyemi", "Bianchi", "Campos", "Donovan", "Esposito", "Farrell", "Gutierrez", "Haas", "Ibarra",
+    "Joshi", "Kim", "Lopez", "Murphy", "Nguyen", "Park", "Ramos", "Silva", "Torres",
+]
+
+
+def _name_pools() -> tuple[list[str], list[str], list[str]]:
+    rng = random.Random("wakesafe-demo-names")
+    female, male, surnames = list(_FEMALE_NAMES), list(_MALE_NAMES), list(_SURNAMES)
+    for pool in (female, male, surnames):
+        rng.shuffle(pool)
+    return female, male, surnames
+
+
+def _display_names(ids: list[str], sex_by_id: dict[str, str]) -> dict[str, str]:
+    female, male, surnames = _name_pools()
+    if len(ids) > len(surnames):
+        raise ValueError("More demo people than surnames; add surnames to synthetic.py.")
+    counts = {"female": 0, "male": 0}
+    names: dict[str, str] = {}
+    for i, pid in enumerate(ids):
+        sex = sex_by_id.get(pid) or ("female" if i % 2 == 0 else "male")  # unknown sex: alternate
+        sex = "male" if sex.strip().lower() in {"male", "m", "man"} else "female"
+        pool = male if sex == "male" else female
+        first = pool[counts[sex] % len(pool)]
+        counts[sex] += 1
+        names[pid] = f"{first} {surnames[i]} (synthetic)"
+    return names
+
+
 def list_personas(*, synthetic_dir: Path = SYNTHETIC_DIR, fixtures_dir: Path = FIXTURES_DIR) -> list[PersonaInfo]:
-    """Ids and neutral display names only. No cohort, label or ground truth."""
-    ids = sorted(_read("profiles.csv", synthetic_dir)["person_id"].astype(str).unique())
+    """Ids and made-up display names only. No cohort, label or ground truth."""
+    profiles = _read("profiles.csv", synthetic_dir)
+    ids = sorted(profiles["person_id"].astype(str).unique())
     ids += [p for p in sorted(_fixture_frames(fixtures_dir)) if p not in ids]
-    return [{"persona_id": p, "display_name": f"Demo person {p}"} for p in ids]
+    sex_by_id = dict(zip(profiles["person_id"].astype(str), profiles["sex"].astype(str)))
+    for pid, base in DEMO_PROFILE_SOURCE.items():  # demo-only people borrow their base person's sex
+        if base in sex_by_id:
+            sex_by_id.setdefault(pid, sex_by_id[base])
+    names = _display_names(ids, sex_by_id)
+    return [{"persona_id": p, "display_name": names[p]} for p in ids]
 
 
 def load_synthetic_nights(

@@ -91,7 +91,7 @@ def test_list_personas_exposes_only_ids_and_neutral_names():
     assert len(personas) == 65 + int((REPO / "fixtures" / "nights_worsening_sample.csv").exists())
     for p in personas:
         assert set(p) == {"persona_id", "display_name"}
-        assert re.fullmatch(r"Demo person P\d{3}", p["display_name"])
+        assert re.fullmatch(r"[A-Z][a-z]+ [A-Z][A-Za-z]+ \(synthetic\)", p["display_name"]), p["display_name"]
     text = " ".join(map(str, personas)).lower()
     for word in ("osa", "apnea", "healthy", "severe", "condition", "cohort", "difficulty", "ahi"):
         assert word not in text
@@ -259,3 +259,20 @@ def test_single_person_upload_samples_load_through_the_csv_provider(pid):
 def test_the_two_person_sample_is_rejected_with_a_clear_message():
     with pytest.raises(ProviderDataError, match="2 different people"):
         load_nights("csv", csv_file=str(SAMPLE))
+
+
+def test_demo_names_are_unique_stable_and_match_the_intake_sex():
+    import pandas as pd
+
+    names = {p["persona_id"]: p["display_name"] for p in list_personas()}
+    assert len(set(names.values())) == len(names) == 65 + int((REPO / "fixtures" / "nights_worsening_sample.csv").exists())
+    assert names == {p["persona_id"]: p["display_name"] for p in list_personas()}  # the same on every call
+    from app.services.whoop.synthetic import _FEMALE_NAMES, _MALE_NAMES
+
+    sex = pd.read_csv(OUT / "profiles.csv", comment="#").set_index("person_id")["sex"]
+    for pid, full in names.items():
+        first = full.split()[0]
+        if pid in sex.index:
+            assert first in (_MALE_NAMES if sex[pid] == "male" else _FEMALE_NAMES), (pid, full)
+    # names are never derived from the answer key, so they cannot reveal a condition
+    assert not any(w in " ".join(names.values()).lower() for w in ("osa", "apnea", "severe", "healthy"))
