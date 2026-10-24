@@ -215,7 +215,7 @@ def make_menopause(rng: random.Random, baseline_nights: int = 7, recent_nights: 
     for d in days[baseline_nights:]:
         ov = {
             "skin_temperature_c": _jitter(rng, 34.4, 0.2),     # +~1C vasomotor shift (lead signal)
-            "sleep_efficiency_pct": _jitter(rng, 83.0, 2.0),   # warm, broken nights
+            "sleep_efficiency_pct": _jitter(rng, 79.0, 2.0),   # warm, broken nights (a clear drop, not borderline)
             "disturbance_count": rng.randint(11, 15),
         }
         rec = _night(rng, pid, d, ov)
@@ -309,14 +309,18 @@ def make_jetlag(rng: random.Random, baseline_nights: int = 7, travel_nights: int
 def build_all(seed: int = SEED) -> list[Persona]:
     """Deterministic set covering normal + apnea + menopause + cardiovascular +
     altitude + jet-lag."""
-    rng = random.Random(seed)
+    # One independent, deterministic random stream per persona, so changing one persona
+    # (for example its number of nights) never shifts the numbers of the others.
+    def rng_for(name: str) -> random.Random:
+        return random.Random(f"{seed}:{name}")
+
     return [
-        make_normal(rng),
-        make_apnea(rng),
-        make_menopause(rng),
-        make_cardiovascular(rng),
-        make_altitude(rng),
-        make_jetlag(rng),
+        make_normal(rng_for("normal")),
+        make_apnea(rng_for("apnea")),
+        make_menopause(rng_for("menopause")),
+        make_cardiovascular(rng_for("cardio")),
+        make_altitude(rng_for("altitude")),
+        make_jetlag(rng_for("jetlag")),
     ]
 
 
