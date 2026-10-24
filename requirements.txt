@@ -6,3 +6,4 @@ wfdb
 pytest
 joblib
 pydantic
+pyyaml
