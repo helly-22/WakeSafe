@@ -1,5 +1,10 @@
 """Train and validate the heart-rate/HRV apnea screening model.
 
+Two models are trained and validated the same way:
+  * runtime model: resting heart rate and RMSSD only, the two signals a wrist wearable also reports.
+    Saved as plain coefficients in JSON so the backend needs no scikit-learn.
+  * ECG five-feature model: kept for comparison only, not applicable to wearable data.
+
 Trains on ml/data/processed/apnea_ecg_nights.csv only (real Apnea-ECG recordings, learning
 and test sets). Never reads or trains on synthetic data. Borderline (class b) recordings
 are excluded.
@@ -25,22 +30,36 @@ from sklearn.model_selection import LeaveOneGroupOut
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-FEATURES = ["mean_hr_bpm", "resting_hr_bpm", "hrv_rmssd_ms", "sdnn_ms", "hr_minute_sd_bpm"]
+ECG_FEATURES = ["mean_hr_bpm", "resting_hr_bpm", "hrv_rmssd_ms", "sdnn_ms", "hr_minute_sd_bpm"]
+WEARABLE_FEATURES = ["resting_hr_bpm", "hrv_rmssd_ms"]
+CUTOFF = 0.5  # fixed in advance (balanced class weights); never tuned on the validation predictions
+RUNTIME_MODEL_VERSION = "apnea-hr-rmssd-v1"
 DATA = Path("ml/data/processed/apnea_ecg_nights.csv")
-MODEL_PATH = Path("ml/models/apnea_hr_hrv.joblib")
+ECG_MODEL_PATH = Path("ml/models/apnea_hr_hrv.joblib")  # gitignored, comparison only
+RUNTIME_MODEL_PATH = Path("backend/app/ml/apnea_resting_hr_rmssd.json")
 METRICS_PATH = Path("backend/app/ml/metrics.json")
 N_BOOT = 2000
 SEED = 0
 
-LIMITATIONS = (
-    "Domain shift: this model was trained on clinical ECG recordings from the PhysioNet "
-    "Apnea-ECG database (32 people in a sleep lab), and it is applied to "
-    "wrist-wearable nightly summaries. Accuracy on WHOOP data is not claimed and has not been "
-    "measured. The task validated here is separating apnea-group recordings from control-group "
-    "recordings, not finding apnea in the general public. Borderline recordings were excluded. "
-    "The sample is small, so the confidence interval is wide. Subjects were inferred from "
-    "matching age, sex, height and weight, which may not be exact. WakeSafe is a screening aid, "
-    "not a diagnosis."
+RUNTIME_LIMITATIONS = (
+    "1) Domain shift: trained on clinical ECG recordings from the PhysioNet Apnea-ECG database "
+    "(32 people in a sleep lab) and applied to wrist-wearable nightly summaries. Accuracy on WHOOP "
+    "data is not claimed and has not been measured; WHOOP's resting heart rate and HRV are not "
+    "computed the same way as the ECG features used here. "
+    "2) The labels contrast recordings with 100 or more apnea minutes against recordings with fewer "
+    "than 5, and borderline recordings were excluded. That is easier than screening a general "
+    "population, so these numbers are optimistic for real use. "
+    "3) Subject grouping for validation was inferred from matching age, sex, height and weight, not "
+    "from a published subject key. "
+    "4) Output probabilities are not calibrated and must not be shown as a percentage. "
+    "The sample is small and the confidence interval is wide. "
+    "WakeSafe is a screening aid, not a diagnosis."
+)
+
+ECG_LIMITATIONS = (
+    "Not applicable to wearable data: it needs ECG-derived features (mean heart rate, SDNN, "
+    "minute-to-minute heart-rate spread) that a wrist device does not report. Kept only to show "
+    "how much the two-feature runtime model gives up. The runtime limitations also apply."
 )
 
 
@@ -74,14 +93,14 @@ def bootstrap_auroc_ci(
     return float(lo), float(hi)
 
 
-def evaluate(df: pd.DataFrame, group_col: str) -> dict:
+def evaluate(df: pd.DataFrame, group_col: str, features: list[str]) -> dict:
     """Leave-one-group-out validation; returns pooled held-out AUROC with a group bootstrap CI."""
-    X, y, groups = df[FEATURES].to_numpy(), df["label"].astype(int).to_numpy(), df[group_col].to_numpy()
+    X, y, groups = df[features].to_numpy(), df["label"].astype(int).to_numpy(), df[group_col].to_numpy()
     oof = np.zeros(len(df))
     for train, test in LeaveOneGroupOut().split(X, y, groups):
         oof[test] = make_model().fit(X[train], y[train]).predict_proba(X[test])[:, 1]
     lo, hi = bootstrap_auroc_ci(y, oof, groups)
-    pred = oof >= 0.5
+    pred = oof >= CUTOFF
     return {
         "n_recordings": int(len(df)),
         "n_groups": int(len(np.unique(groups))),
@@ -89,9 +108,43 @@ def evaluate(df: pd.DataFrame, group_col: str) -> dict:
         "n_control": int((y == 0).sum()),
         "auroc": round(float(roc_auc_score(y, oof)), 3),
         "auroc_ci95": [round(lo, 3), round(hi, 3)],
-        "sensitivity_at_0.5": round(float(pred[y == 1].mean()), 3),
-        "specificity_at_0.5": round(float((~pred[y == 0]).mean()), 3),
+        "cutoff": CUTOFF,
+        "sensitivity_at_cutoff": round(float(pred[y == 1].mean()), 3),
+        "specificity_at_cutoff": round(float((~pred[y == 0]).mean()), 3),
     }
+
+
+def fit_full(df: pd.DataFrame, features: list[str]) -> object:
+    return make_model().fit(df[features].to_numpy(), df["label"].astype(int).to_numpy())
+
+
+def runtime_artifact(model: object, features: list[str], ev: dict) -> dict:
+    """Plain-number description of the fitted pipeline: standardize, then logistic regression."""
+    scaler, lr = model[0], model[-1]
+    return {
+        "model_version": RUNTIME_MODEL_VERSION,
+        "kind": "standardize_then_logistic_regression",
+        "features": features,
+        "units": {"resting_hr_bpm": "beats per minute", "hrv_rmssd_ms": "milliseconds"},
+        "scaler_mean": [float(v) for v in scaler.mean_],
+        "scaler_scale": [float(v) for v in scaler.scale_],
+        "coef": [float(v) for v in lr.coef_[0]],
+        "intercept": float(lr.intercept_[0]),
+        "cutoff": CUTOFF,
+        "probability_calibrated": False,
+        "trained_on": "PhysioNet Apnea-ECG 1.0.0 real recordings only",
+        "n_recordings": ev["n_recordings"],
+        "n_subjects": ev["n_groups"],
+        "validation_auroc": ev["auroc"],
+        "validation_auroc_ci95": ev["auroc_ci95"],
+        "limitations": RUNTIME_LIMITATIONS,
+    }
+
+
+def summarize(ev: dict) -> dict:
+    out = dict(ev)
+    out["n_subjects"] = out.pop("n_groups")
+    return out
 
 
 def main() -> None:
@@ -99,35 +152,42 @@ def main() -> None:
     assert_real_data(df, DATA)
     n_excluded = int(df["label"].isna().sum())
     df = df.dropna(subset=["label"]).reset_index(drop=True)
-    learning = df[df["record_set"] == "learning"].reset_index(drop=True)
 
-    main_eval = evaluate(df, "subject_id")
-    comparison = {
-        "learning_set_by_recording_previous_method": evaluate(learning, "person_id"),
-        "learning_set_by_subject": evaluate(learning, "subject_id"),
-        "all_usable_by_recording": evaluate(df, "person_id"),
-    }
+    runtime_eval = evaluate(df, "subject_id", WEARABLE_FEATURES)
+    ecg_eval = evaluate(df, "subject_id", ECG_FEATURES)
 
-    X, y = df[FEATURES].to_numpy(), df["label"].astype(int).to_numpy()
-    model = make_model().fit(X, y)
-    coefs = dict(zip(FEATURES, (float(c) for c in model[-1].coef_[0])))
+    runtime_model = fit_full(df, WEARABLE_FEATURES)
+    ecg_model = fit_full(df, ECG_FEATURES)
+    RUNTIME_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    RUNTIME_MODEL_PATH.write_text(json.dumps(runtime_artifact(runtime_model, WEARABLE_FEATURES, runtime_eval), indent=2) + "\n")
+    ECG_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump({"model": ecg_model, "features": ECG_FEATURES}, ECG_MODEL_PATH)
 
-    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"model": model, "features": FEATURES}, MODEL_PATH)
+    def coefs(model: object, features: list[str]) -> dict:
+        return {k: round(float(c), 3) for k, c in zip(features, model[-1].coef_[0])}
 
     metrics = {
-        "model": "StandardScaler + LogisticRegression(C=1.0, class_weight=balanced)",
+        "model": "StandardScaler + LogisticRegression(C=1.0, class_weight=balanced), resting heart rate and RMSSD",
+        "model_version": RUNTIME_MODEL_VERSION,
         "dataset": "PhysioNet Apnea-ECG 1.0.0, learning and test sets (real recordings only)",
         "validation": "leave-one-subject-out; all recordings of one person are held out together",
         "subject_grouping": "inferred from identical age, sex, height and weight in additional-information.txt",
         "class_definition": "apnea minutes >= 100 is apnea, < 5 is control, otherwise borderline (excluded)",
-        **main_eval,
+        **summarize(runtime_eval),
         "n_borderline_excluded": n_excluded,
         "ci_method": f"percentile bootstrap resampling subjects, {N_BOOT} resamples, seed {SEED}",
-        "comparison": comparison,
-        "features": FEATURES,
-        "standardized_coefficients": {k: round(v, 3) for k, v in coefs.items()},
-        "limitations": LIMITATIONS,
+        "cutoff_note": "Cutoff 0.5 was fixed in advance, not tuned on the validation predictions.",
+        "features": WEARABLE_FEATURES,
+        "standardized_coefficients": coefs(runtime_model, WEARABLE_FEATURES),
+        "runtime_artifact": "backend/app/ml/apnea_resting_hr_rmssd.json",
+        "limitations": RUNTIME_LIMITATIONS,
+        "ecg_five_feature_model": {
+            "applicability": "not applicable to wearable data",
+            **summarize(ecg_eval),
+            "features": ECG_FEATURES,
+            "standardized_coefficients": coefs(ecg_model, ECG_FEATURES),
+            "limitations": ECG_LIMITATIONS,
+        },
     }
     METRICS_PATH.write_text(json.dumps(metrics, indent=2) + "\n")
     print(json.dumps({k: v for k, v in metrics.items() if k != "limitations"}, indent=2))

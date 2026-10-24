@@ -56,8 +56,24 @@ Only beats inside the annotated minutes are used.
 
 ## Model inputs
 
-Training uses only the wearable-style columns: `mean_hr_bpm`, `resting_hr_bpm`, `hrv_rmssd_ms`,
-`sdnn_ms`, `hr_minute_sd_bpm`. Never `apnea_minutes`, `apnea_minute_fraction`, `label`, `group`, `person_id`, or `subject_id`.
+Two models are trained by `ml/training/train_apnea_model.py`, both on the 60 usable recordings (40 apnea, 20 control,
+29 subjects), validated leave-one-subject-out with a subject-level bootstrap CI.
+
+**Runtime model (used by the app): `resting_hr_bpm` and `hrv_rmssd_ms` only.** These are the two columns a wrist wearable also reports.
+It is a standardized logistic regression stored as plain numbers in `backend/app/ml/apnea_resting_hr_rmssd.json`
+(feature means and scales, coefficients, intercept, cutoff), so the backend needs no scikit-learn. The score is
+`1 / (1 + exp(-(intercept + sum(coef * z))))` with `z = (value - mean) / scale`.
+Cutoff 0.5 was fixed in advance and not tuned. The score is not a calibrated probability and must not be shown as a percentage.
+Validation: AUROC 0.760 (95% CI 0.565 to 0.920), sensitivity 0.70 and specificity 0.75 at the cutoff.
+
+**ECG five-feature model (comparison only, not applicable to wearable data):** `mean_hr_bpm`, `resting_hr_bpm`, `hrv_rmssd_ms`,
+`sdnn_ms`, `hr_minute_sd_bpm`. AUROC 0.856 (95% CI 0.701 to 0.980). It shows what the two wearable-compatible features give up.
+It is saved only as a gitignored local file.
+
+Never a model input: `apnea_minutes`, `apnea_minute_fraction`, `label`, `group`, `person_id`, `subject_id`.
+
+The resting heart rate here is the lowest 5 minute average over the recording. A wearable's resting heart rate and HRV are not
+computed the same way, so applying the model to them is an assumption, not a validated result.
 
 ## Limits
 

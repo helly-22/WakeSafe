@@ -1,76 +1,63 @@
 {
-  "model": "StandardScaler + LogisticRegression(C=1.0, class_weight=balanced)",
+  "model": "StandardScaler + LogisticRegression(C=1.0, class_weight=balanced), resting heart rate and RMSSD",
+  "model_version": "apnea-hr-rmssd-v1",
   "dataset": "PhysioNet Apnea-ECG 1.0.0, learning and test sets (real recordings only)",
   "validation": "leave-one-subject-out; all recordings of one person are held out together",
   "subject_grouping": "inferred from identical age, sex, height and weight in additional-information.txt",
   "class_definition": "apnea minutes >= 100 is apnea, < 5 is control, otherwise borderline (excluded)",
   "n_recordings": 60,
-  "n_groups": 29,
   "n_apnea": 40,
   "n_control": 20,
-  "auroc": 0.856,
+  "auroc": 0.76,
   "auroc_ci95": [
-    0.701,
-    0.98
+    0.565,
+    0.92
   ],
-  "sensitivity_at_0.5": 0.8,
-  "specificity_at_0.5": 0.75,
+  "cutoff": 0.5,
+  "sensitivity_at_cutoff": 0.7,
+  "specificity_at_cutoff": 0.75,
+  "n_subjects": 29,
   "n_borderline_excluded": 10,
   "ci_method": "percentile bootstrap resampling subjects, 2000 resamples, seed 0",
-  "comparison": {
-    "learning_set_by_recording_previous_method": {
-      "n_recordings": 30,
-      "n_groups": 30,
-      "n_apnea": 20,
-      "n_control": 10,
-      "auroc": 0.785,
-      "auroc_ci95": [
-        0.584,
-        0.963
-      ],
-      "sensitivity_at_0.5": 0.75,
-      "specificity_at_0.5": 0.7
-    },
-    "learning_set_by_subject": {
-      "n_recordings": 30,
-      "n_groups": 22,
-      "n_apnea": 20,
-      "n_control": 10,
-      "auroc": 0.73,
-      "auroc_ci95": [
-        0.478,
-        0.954
-      ],
-      "sensitivity_at_0.5": 0.6,
-      "specificity_at_0.5": 0.7
-    },
-    "all_usable_by_recording": {
-      "n_recordings": 60,
-      "n_groups": 60,
-      "n_apnea": 40,
-      "n_control": 20,
-      "auroc": 0.89,
-      "auroc_ci95": [
-        0.79,
-        0.965
-      ],
-      "sensitivity_at_0.5": 0.825,
-      "specificity_at_0.5": 0.8
-    }
-  },
+  "cutoff_note": "Cutoff 0.5 was fixed in advance, not tuned on the validation predictions.",
   "features": [
-    "mean_hr_bpm",
     "resting_hr_bpm",
-    "hrv_rmssd_ms",
-    "sdnn_ms",
-    "hr_minute_sd_bpm"
+    "hrv_rmssd_ms"
   ],
   "standardized_coefficients": {
-    "mean_hr_bpm": 0.867,
-    "resting_hr_bpm": 0.865,
-    "hrv_rmssd_ms": -1.129,
-    "sdnn_ms": 1.83,
-    "hr_minute_sd_bpm": -0.859
+    "resting_hr_bpm": 1.069,
+    "hrv_rmssd_ms": -0.255
   },
-  "limitations": "Domain shift: this model was trained on clinical ECG recordings from the PhysioNet Apnea-ECG database (32 people in a sleep lab), and it is applied to wrist-wearable nightly summaries. Accuracy on WHOOP data is not claimed and has not been measured. The task validated here is separating apnea-group recordings from control-group recordings, not finding apnea in the general public. Borderline recordings were excluded. The sample is small, so the confidence interval is wide. Subjects were inferred from matching age, sex, height and weight, which may not be exact. WakeSafe is a screening aid, not a diagnosis."
+  "runtime_artifact": "backend/app/ml/apnea_resting_hr_rmssd.json",
+  "limitations": "1) Domain shift: trained on clinical ECG recordings from the PhysioNet Apnea-ECG database (32 people in a sleep lab) and applied to wrist-wearable nightly summaries. Accuracy on WHOOP data is not claimed and has not been measured; WHOOP's resting heart rate and HRV are not computed the same way as the ECG features used here. 2) The labels contrast recordings with 100 or more apnea minutes against recordings with fewer than 5, and borderline recordings were excluded. That is easier than screening a general population, so these numbers are optimistic for real use. 3) Subject grouping for validation was inferred from matching age, sex, height and weight, not from a published subject key. 4) Output probabilities are not calibrated and must not be shown as a percentage. The sample is small and the confidence interval is wide. WakeSafe is a screening aid, not a diagnosis.",
+  "ecg_five_feature_model": {
+    "applicability": "not applicable to wearable data",
+    "n_recordings": 60,
+    "n_apnea": 40,
+    "n_control": 20,
+    "auroc": 0.856,
+    "auroc_ci95": [
+      0.701,
+      0.98
+    ],
+    "cutoff": 0.5,
+    "sensitivity_at_cutoff": 0.8,
+    "specificity_at_cutoff": 0.75,
+    "n_subjects": 29,
+    "features": [
+      "mean_hr_bpm",
+      "resting_hr_bpm",
+      "hrv_rmssd_ms",
+      "sdnn_ms",
+      "hr_minute_sd_bpm"
+    ],
+    "standardized_coefficients": {
+      "mean_hr_bpm": 0.867,
+      "resting_hr_bpm": 0.865,
+      "hrv_rmssd_ms": -1.129,
+      "sdnn_ms": 1.83,
+      "hr_minute_sd_bpm": -0.859
+    },
+    "limitations": "Not applicable to wearable data: it needs ECG-derived features (mean heart rate, SDNN, minute-to-minute heart-rate spread) that a wrist device does not report. Kept only to show how much the two-feature runtime model gives up. The runtime limitations also apply."
+  }
 }

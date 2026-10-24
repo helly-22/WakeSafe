@@ -71,3 +71,35 @@ def test_training_rejects_synthetic_input(tmp_path):
     path.write_text("# SYNTHETIC DATA\nperson_id,is_synthetic\nP001,True\n")
     with pytest.raises(ValueError):
         assert_real_data(pd.read_csv(path, comment="#"), path)
+
+
+def test_runtime_artifact_matches_sklearn_pipeline():
+    import numpy as np
+
+    sys.path.insert(0, str(REPO / "backend"))
+    from app.services.screening.model import apnea_model_score
+    from ml.training.train_apnea_model import WEARABLE_FEATURES, make_model, runtime_artifact
+
+    rng = np.random.default_rng(0)
+    X = np.column_stack([rng.normal(60, 8, 40), rng.normal(40, 20, 40)])
+    y = (X[:, 0] + rng.normal(0, 6, 40) > 60).astype(int)
+    model = make_model().fit(X, y)
+    art = runtime_artifact(model, WEARABLE_FEATURES, {"n_recordings": 40, "n_groups": 40, "auroc": 0.5, "auroc_ci95": [0.4, 0.6]})
+    for hr, rmssd in [(52.0, 80.0), (60.0, 40.0), (75.0, 20.0)]:
+        expected = model.predict_proba([[hr, rmssd]])[0, 1]
+        assert apnea_model_score(art, hr, rmssd) == pytest.approx(expected, abs=1e-9)
+
+
+def test_committed_metrics_state_required_limitations_and_labels():
+    import json
+
+    m = json.loads((REPO / "backend" / "app" / "ml" / "metrics.json").read_text())
+    assert m["features"] == ["resting_hr_bpm", "hrv_rmssd_ms"]
+    assert m["n_recordings"] == 60 and m["n_subjects"] == 29
+    assert m["auroc_ci95"][0] < m["auroc"] < m["auroc_ci95"][1]
+    for key in ("cutoff", "sensitivity_at_cutoff", "specificity_at_cutoff"):
+        assert key in m
+    text = m["limitations"].lower()
+    for phrase in ("whoop", "not claimed", "fewer than 5", "borderline", "inferred", "not calibrated"):
+        assert phrase in text
+    assert m["ecg_five_feature_model"]["applicability"] == "not applicable to wearable data"

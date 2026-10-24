@@ -148,3 +148,33 @@ def test_all_nan_spo2_gives_no_z():
 def test_too_few_nights_gives_no_z():
     df = make_nights(n=8, calibrating=0)
     assert baseline_zscores(df)["spo2_percentage"]["z"] is None
+
+
+# Runtime apnea model scorer
+
+import json
+
+from app.services.screening.model import RUNTIME_ARTIFACT_PATH, apnea_model_score, load_apnea_artifact
+
+
+def test_apnea_model_score_follows_the_stated_formula():
+    art = {
+        "features": ["resting_hr_bpm", "hrv_rmssd_ms"],
+        "scaler_mean": [60.0, 40.0],
+        "scaler_scale": [10.0, 20.0],
+        "coef": [1.0, -0.5],
+        "intercept": 0.0,
+    }
+    assert apnea_model_score(art, 60.0, 40.0) == 0.5
+    # z = (1.0, -1.0): logit = 1.0 + 0.5 = 1.5
+    assert abs(apnea_model_score(art, 70.0, 20.0) - 1 / (1 + np.exp(-1.5))) < 1e-12
+
+
+def test_committed_artifact_is_monotonic_and_bounded():
+    art = load_apnea_artifact()
+    assert RUNTIME_ARTIFACT_PATH.exists()
+    assert art["features"] == ["resting_hr_bpm", "hrv_rmssd_ms"] and art["probability_calibrated"] is False
+    low = apnea_model_score(art, 50.0, 60.0)
+    high = apnea_model_score(art, 75.0, 20.0)
+    assert 0.0 < low < high < 1.0
+    json.dumps(art)
