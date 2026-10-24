@@ -69,7 +69,7 @@ def get_risk(assessment: RiskAssessment, risk_id: str) -> RiskItem:
 # ---- contract shape ---------------------------------------------------------
 
 
-def test_returns_all_five_groups_and_stamps_version_and_disclaimer():
+def test_returns_all_six_groups_and_stamps_version_and_disclaimer():
     a = assess_risks(make_profile(), make_features(), make_apnea("Low"))
     assert {r.risk_id for r in a.risks} == {
         "sleep_disordered_breathing",
@@ -77,6 +77,7 @@ def test_returns_all_five_groups_and_stamps_version_and_disclaimer():
         "metabolic",
         "respiratory",
         "acute_illness",
+        "menopause",
     }
     assert a.rules_version == RULES_VERSION
     assert "screening" in a.disclaimer.lower() and "not a diagnosis" in a.disclaimer.lower()
@@ -224,3 +225,68 @@ def test_large_dip_persists_even_when_traveling():
     )
     sdb = get_risk(a, "sleep_disordered_breathing")
     assert any("altitude you're at" in r for r in sdb.reasons)
+
+
+# ---- Menopause / perimenopause (6th group) ----------------------------------
+
+
+def test_menopause_fires_on_warm_disturbed_nights_without_apnea_signature():
+    # Sleep efficiency down + disturbances up, but NO SpO2 dip and NO raised
+    # respiratory rate -> the warm/disturbed pattern is attributed to menopause.
+    a = assess_risks(
+        make_profile(),
+        make_features(z={"sleep_efficiency_pct": -3.0, "disturbance_count": 3.5}),
+        make_apnea("Low"),
+    )
+    meno = get_risk(a, "menopause")
+    assert meno.tier in ("Moderate", "High"), [(r.risk_id, r.tier) for r in a.risks]
+    assert "gynecology" in meno.suggested_specialty.lower() or \
+        "endocrin" in meno.suggested_specialty.lower()
+    assert a.urgent_override is False
+
+
+def test_menopause_suppressed_when_signals_fit_apnea_breathing_pattern():
+    # The SAME disturbed-sleep signals, but now with an SpO2 dip -> the pattern
+    # better fits sleep-disordered breathing, so menopause does NOT fire.
+    a = assess_risks(
+        make_profile(),
+        make_features(
+            z={"sleep_efficiency_pct": -3.0, "disturbance_count": 3.5, "spo2_pct": -3.0}
+        ),
+        make_apnea("Moderate"),
+    )
+    meno = get_risk(a, "menopause")
+    assert meno.tier == "Low", (meno.tier, meno.reasons)
+    assert any("breathing pattern" in r for r in meno.reasons)
+    # and the breathing group does register it
+    assert get_risk(a, "sleep_disordered_breathing").tier in ("Moderate", "High")
+
+
+def test_menopause_reported_condition_fires_even_without_temp_signal():
+    # A reported peri/menopause symptom counts on its own, regardless of the
+    # apnea-signature gate.
+    a = assess_risks(
+        make_profile(conditions=["hot flashes", "irregular periods"]),
+        make_features(),
+        make_apnea("Low"),
+    )
+    meno = get_risk(a, "menopause")
+    assert meno.tier in ("Moderate", "High"), (meno.tier, meno.reasons)
+    assert "patient_reported" in meno.source_labels
+
+
+def test_menopause_condition_counts_even_with_apnea_signature():
+    # Reported symptoms bypass the gate: even with an SpO2 dip present, a
+    # reported hot-flashes history still attributes points to menopause.
+    a = assess_risks(
+        make_profile(conditions=["perimenopause"]),
+        make_features(z={"spo2_pct": -3.0}),
+        make_apnea("Moderate"),
+    )
+    meno = get_risk(a, "menopause")
+    assert meno.tier in ("Moderate", "High"), (meno.tier, meno.reasons)
+
+
+def test_menopause_calm_person_stays_low():
+    a = assess_risks(make_profile(), make_features(), make_apnea("Low"))
+    assert get_risk(a, "menopause").tier == "Low"

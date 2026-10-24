@@ -102,23 +102,27 @@ def _night(
     """Build one NightRecord from baseline + per-metric jitter + overrides."""
     overrides = overrides or {}
     vals: dict[str, float | int | None] = {}
+    # Spreads are the half-width of the uniform night-to-night jitter; the
+    # resulting per-metric baseline std is ~spread/sqrt(3). They are sized so a
+    # person's OWN baseline carries realistic variability (so a later few-SD
+    # shift reads as a believable z-score, not a divide-by-near-zero blow-up).
     spreads = {
-        "resting_heart_rate_bpm": 1.5,
-        "hrv_rmssd_ms": 4.0,
-        "spo2_pct": 0.4,
-        "respiratory_rate_rpm": 0.4,
-        "skin_temperature_c": 0.2,
-        "sleep_duration_minutes": 20.0,
-        "sleep_efficiency_pct": 2.0,
-        "deep_sleep_minutes": 10.0,
-        "rem_sleep_minutes": 12.0,
-        "sleep_consistency_pct": 4.0,
+        "resting_heart_rate_bpm": 3.5,      # std ~2.0 bpm
+        "hrv_rmssd_ms": 7.0,                 # std ~4 ms
+        "spo2_pct": 1.4,                     # std ~0.8 %
+        "respiratory_rate_rpm": 1.0,         # std ~0.6 rpm
+        "skin_temperature_c": 0.5,           # std ~0.29 C
+        "sleep_duration_minutes": 25.0,
+        "sleep_efficiency_pct": 6.0,         # std ~3.5 %
+        "deep_sleep_minutes": 12.0,
+        "rem_sleep_minutes": 14.0,
+        "sleep_consistency_pct": 5.0,
     }
     for metric, mean in BASELINE.items():
         if metric in overrides:
             vals[metric] = overrides[metric]
         elif metric == "disturbance_count":
-            vals[metric] = max(0, int(round(mean + rng.uniform(-2, 2))))
+            vals[metric] = max(0, int(round(mean + rng.uniform(-4, 4))))
         else:
             vals[metric] = _jitter(rng, float(mean), spreads[metric])
     return NightRecord(
@@ -140,25 +144,72 @@ def make_normal(rng: random.Random, nights: int = 7) -> Persona:
     return Persona(pid, "Demo normal sleeper", recs)
 
 
-def make_apnea(rng: random.Random, nights: int = 7) -> Persona:
-    """Apnea pattern on 4 of 7 nights: SpO2 dips, raised RR, many disturbances,
-    low efficiency. A frequency like '4 of 7 nights' is demonstrable."""
+def make_apnea(rng: random.Random, baseline_nights: int = 7, recent_nights: int = 7) -> Persona:
+    """Apnea pattern that DEVIATES FROM THE PERSON'S OWN BASELINE.
+
+    compute_features scores a deviation as (recent-7-night mean - earlier
+    baseline mean) / baseline std, and it needs at least 7 earlier nights plus
+    the recent 7 before any z-score is non-None. So the persona is built as two
+    phases on consecutive dates:
+
+      * ``baseline_nights`` (>=7) of near-normal sleep -- the person's own
+        reference the engine compares against; and
+      * ``recent_nights`` (>=7) of a clear apnea pattern -- every recent night
+        desaturates (SpO2 into the high-80s/low-90s), runs an elevated
+        respiratory rate and a high disturbance count, with poor efficiency.
+
+    The whole recent window deviating (not 4 of 7) is what drives the recent-mean
+    away from baseline enough to raise negative SpO2 / positive RR z-scores past
+    the risk engine's threshold -> Sleep-disordered breathing Moderate/High.
+    """
     pid = "SYN-APNEA"
-    affected = {0, 2, 4, 6}  # 4 of 7
+    total = baseline_nights + recent_nights
+    days = _days(total)
     recs: list[NightRecord] = []
-    for i, d in enumerate(_days(nights)):
-        if i in affected:
-            ov = {
-                "spo2_pct": _jitter(rng, 89.5, 1.0),           # clear desaturation
-                "respiratory_rate_rpm": _jitter(rng, 17.8, 0.5),
-                "disturbance_count": rng.randint(22, 34),
-                "sleep_efficiency_pct": _jitter(rng, 74.0, 2.0),
-                "deep_sleep_minutes": _jitter(rng, 48.0, 6.0),
-            }
-            recs.append(_night(rng, pid, d, ov))
-        else:
-            recs.append(_night(rng, pid, d))
+    # Phase 1: near-normal baseline nights.
+    for d in days[:baseline_nights]:
+        recs.append(_night(rng, pid, d))
+    # Phase 2: recent apnea nights -- every night deviates, by a few SD of the
+    # person's own baseline (not an implausible blow-up).
+    for d in days[baseline_nights:]:
+        ov = {
+            "spo2_pct": _jitter(rng, 92.5, 0.9),             # ~5 SD desaturation
+            "respiratory_rate_rpm": _jitter(rng, 16.6, 0.5),  # elevated
+            "disturbance_count": rng.randint(13, 19),         # fragmented sleep
+            "sleep_efficiency_pct": _jitter(rng, 82.0, 2.0),
+            "deep_sleep_minutes": _jitter(rng, 60.0, 6.0),
+        }
+        recs.append(_night(rng, pid, d, ov))
     return Persona(pid, "Demo apnea pattern", recs)
+
+
+def make_menopause(rng: random.Random, baseline_nights: int = 7, recent_nights: int = 7) -> Persona:
+    """Peri/menopause pattern that deviates from the person's own baseline.
+
+    Signals the risk engine's menopause group keys off: a skin-temperature SHIFT
+    (vasomotor / night-sweat nights run warmer), warm + disturbed nights (sleep
+    efficiency down, disturbance count up with temperature up). Built as a
+    near-normal baseline phase then a recent phase where those signals deviate,
+    so (recent mean - baseline mean)/std clears the z threshold.
+
+    The generator cannot set profile.conditions (fixtures are nights-only); the
+    cycle-irregularity path ("irregular periods"/"hot flashes") is exercised by
+    the risk-engine unit tests via a profile, not here.
+    """
+    pid = "SYN-MENOPAUSE"
+    total = baseline_nights + recent_nights
+    days = _days(total)
+    recs: list[NightRecord] = []
+    for d in days[:baseline_nights]:
+        recs.append(_night(rng, pid, d))
+    for d in days[baseline_nights:]:
+        ov = {
+            "skin_temperature_c": _jitter(rng, 34.4, 0.2),     # +~1C vasomotor shift (lead signal)
+            "sleep_efficiency_pct": _jitter(rng, 83.0, 2.0),   # warm, broken nights
+            "disturbance_count": rng.randint(11, 15),
+        }
+        recs.append(_night(rng, pid, d, ov))
+    return Persona(pid, "Demo peri/menopause pattern", recs)
 
 
 def make_cardiovascular(rng: random.Random, nights: int = 10) -> Persona:
@@ -224,11 +275,13 @@ def make_jetlag(rng: random.Random, nights: int = 5) -> Persona:
 
 
 def build_all(seed: int = SEED) -> list[Persona]:
-    """Deterministic set covering normal + apnea + cardiovascular + altitude + jet-lag."""
+    """Deterministic set covering normal + apnea + menopause + cardiovascular +
+    altitude + jet-lag."""
     rng = random.Random(seed)
     return [
         make_normal(rng),
         make_apnea(rng),
+        make_menopause(rng),
         make_cardiovascular(rng),
         make_altitude(rng),
         make_jetlag(rng),

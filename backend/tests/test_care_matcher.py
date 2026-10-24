@@ -140,3 +140,89 @@ def test_output_conforms_to_contract():
         assert rec.capacity_source in {"static", "simulated", "live", "unknown"}
         assert isinstance(rec.rank_score, float)
         assert rec.notes  # one-line "why this one"
+
+
+# --------------------------------------------------------------------------- #
+# BUG 3: specialty matching against the REAL hospitals.csv shape
+# --------------------------------------------------------------------------- #
+#
+# The real catalogue uses `lat`/`lon` columns and lists hospital UNIT flags
+# (emergency;icu;med_surg;stroke;...), never an outpatient "sleep medicine"
+# value. The matcher must still route a non-urgent apnea case to a facility that
+# plausibly offers sleep/pulmonology care, and say when that is inferred.
+
+from app.services.care.matcher import enrich_specialties, _lat_lon  # noqa: E402
+
+_REAL_SHAPE_CSV = """facility_id,name,address,lat,lon,specialties,licensed_beds,staffed_beds
+ma-big,Giant Trauma ER,"1 Big St, Boston MA",42.3632,-71.0688,emergency;icu;ccu_cardiac;med_surg;stroke;trauma,1045,
+ma-psych,Standalone Psych Hospital,"2 Calm Rd, Boston MA",42.3605,-71.0600,psychiatric,358,
+ma-comm,Community Medical Center,"3 Main St, Boston MA",42.3610,-71.0595,emergency;icu;med_surg;stroke,250,
+"""
+
+
+def _write_real_shape_csv(tmp_path):
+    p = tmp_path / "hospitals_real_shape.csv"
+    p.write_text(_REAL_SHAPE_CSV, encoding="utf-8")
+    return p
+
+
+def test_unit_flags_map_to_sleep_pulmonology_and_are_marked_inferred():
+    full, inferred = enrich_specialties(["emergency", "icu", "med_surg", "stroke"])
+    # Derived care specialties appear...
+    assert "sleep medicine" in full
+    assert "pulmonology" in full
+    assert "cardiology" in full  # from stroke/ccu
+    # ...and are flagged as inferred (not reported directly).
+    assert "sleep medicine" in inferred
+    assert "pulmonology" in inferred
+
+
+def test_lat_lon_alias_reads_real_csv_columns():
+    assert _lat_lon({"lat": "42.5", "lon": "-71.1"}) == (42.5, -71.1)
+    assert _lat_lon({"latitude": "42.5", "longitude": "-71.1"}) == (42.5, -71.1)
+    assert _lat_lon({}) == (None, None)
+
+
+def test_apnea_case_top_pick_covers_sleep_or_pulmonology(tmp_path):
+    csv_path = _write_real_shape_csv(tmp_path)
+    assessment = _assessment(
+        [_risk("sleep_disordered_breathing", "Sleep-disordered breathing", "High", "Sleep medicine")]
+    )
+    result = recommend_care(assessment, BOSTON_LAT, BOSTON_LON, csv_path=csv_path)
+
+    assert result.care_tier == "Elevated"  # High, not urgent
+    top = result.recommendations[0]
+    # The top pick genuinely covers sleep medicine or pulmonology (not chosen as a
+    # generic ER while ignoring the specialty map).
+    assert any(s in top.specialties for s in ("sleep medicine", "pulmonology"))
+    # The psych-only hospital, which cannot offer sleep/pulmonology, ranks last.
+    assert result.recommendations[-1].facility_id == "ma-psych"
+    # The note is honest: it says the specialty is inferred from units.
+    assert any("inferred" in n.lower() for n in top.notes)
+
+
+def test_apnea_case_does_not_rank_specialtyless_facility_first(tmp_path):
+    # A facility with NO sleep/pulmonology capability must not outrank one that
+    # has it for an apnea case.
+    csv_path = _write_real_shape_csv(tmp_path)
+    assessment = _assessment(
+        [_risk("sleep_disordered_breathing", "Sleep-disordered breathing", "Moderate", "Sleep medicine")]
+    )
+    result = recommend_care(assessment, BOSTON_LAT, BOSTON_LON, csv_path=csv_path)
+    top = result.recommendations[0]
+    assert top.facility_id != "ma-psych"
+    assert any(s in top.specialties for s in ("sleep medicine", "pulmonology"))
+
+
+def test_urgent_still_routes_to_ed_with_real_csv_shape(tmp_path):
+    csv_path = _write_real_shape_csv(tmp_path)
+    assessment = _assessment(
+        [_risk("cardio_redflag", "Possible cardiac event", "Urgent", "cardiology")],
+        urgent=True,
+        urgent_reasons=["chest pain reported"],
+    )
+    result = recommend_care(assessment, BOSTON_LAT, BOSTON_LON, csv_path=csv_path)
+    assert result.care_tier == "Urgent"
+    top = result.recommendations[0]
+    assert "emergency" in top.specialties
+    assert any("911" in n for n in top.notes)

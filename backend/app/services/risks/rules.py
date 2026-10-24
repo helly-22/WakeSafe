@@ -1,13 +1,15 @@
 """Rule-based multi-domain risk engine for WakeSafe (Person B).
 
 `assess_risks` turns a profile, a feature set and the apnea screening tier into a
-`RiskAssessment` (frozen contract, app.models.schemas). Five risk groups are scored:
+`RiskAssessment` (frozen contract, app.models.schemas). Six risk groups are scored:
 
   * sleep_disordered_breathing  (seeds off the apnea tier + SpO2/respiratory trends)
   * cardiovascular              (cardiac folds in here)
   * metabolic
   * respiratory
   * acute_illness
+  * menopause                   (peri/menopause: skin-temp shift, warm/disturbed nights,
+                                 reported cycle irregularity / hot flashes)
 
 Scoring, per group:
   * a fixed BASELINE of points for each relevant reported condition
@@ -119,6 +121,11 @@ GROUP_SIGNALS: dict[str, dict[str, tuple[str, int]]] = {
         "resting_heart_rate_bpm": ("resting heart rate", +1),
         "respiratory_rate_rpm": ("respiratory rate", +1),
     },
+    "menopause": {
+        "skin_temperature_c": ("skin temperature", +1),
+        "sleep_efficiency_pct": ("sleep efficiency", -1),
+        "disturbance_count": ("sleep disturbances", +1),
+    },
 }
 
 # Reported conditions (lower-cased substring) that count toward each group.
@@ -145,6 +152,18 @@ GROUP_CONDITIONS: dict[str, tuple[str, ...]] = {
     ),
     "respiratory": ("asthma", "copd", "bronchitis", "emphysema", "sleep apnea"),
     "acute_illness": ("immunocompromised", "recent illness", "recent infection"),
+    "menopause": (
+        "menopause",
+        "perimenopause",
+        "peri-menopause",
+        "hot flashes",
+        "hot flushes",
+        "night sweats",
+        "irregular periods",
+        "irregular cycle",
+        "cycle irregularity",
+        "vasomotor",
+    ),
 }
 
 GROUP_DISPLAY: dict[str, str] = {
@@ -153,6 +172,7 @@ GROUP_DISPLAY: dict[str, str] = {
     "metabolic": "Metabolic",
     "respiratory": "Respiratory",
     "acute_illness": "Acute illness",
+    "menopause": "Menopause / perimenopause",
 }
 
 GROUP_SPECIALTY: dict[str, str] = {
@@ -161,6 +181,7 @@ GROUP_SPECIALTY: dict[str, str] = {
     "metabolic": "Endocrinology / primary care",
     "respiratory": "Pulmonology",
     "acute_illness": "Primary care",
+    "menopause": "Gynecology / endocrinology",
 }
 
 # Which group a red-flag symptom escalates. Default is cardiovascular (the 911
@@ -282,6 +303,33 @@ def _score_group(
         sources.add("patient_reported")
 
     # Baseline-z signals.
+    #
+    # Menopause gate: its warm/disturbed-night signals (sleep efficiency down,
+    # disturbances up) are NON-specific -- apnea and acute illness fragment sleep
+    # too. The feature engine does not emit a skin-temperature z-score (it is not
+    # in its Z_FIELDS), so we cannot key the hallmark vasomotor temperature shift
+    # off a z-score here. Instead we distinguish by what menopause is NOT: it does
+    # not desaturate SpO2 and does not run an elevated respiratory rate (that is
+    # the apnea signature). So the menopause group scores its sleep signals only
+    # when there is NO apnea-type respiratory signature, OR a peri/menopause
+    # condition was reported. Otherwise an apnea night would spuriously fire it.
+    if group == "menopause" and not cond_hits:
+        spo2_z = z_scores.get("spo2_pct")
+        rr_z = z_scores.get("respiratory_rate_rpm")
+        apnea_like = (
+            (spo2_z is not None and -spo2_z >= CONFIG["z_threshold"])
+            or (rr_z is not None and rr_z >= CONFIG["z_threshold"])
+        )
+        if apnea_like:
+            reasons.append(
+                "Disturbed-sleep signals here better fit a breathing pattern "
+                "(SpO2 dip / raised respiratory rate), so they are attributed to "
+                "sleep-disordered breathing, not menopause."
+            )
+            return _GroupScore(
+                points=points, reasons=reasons, sources=sources, travel_softened=False
+            )
+
     for key, (label, direction) in GROUP_SIGNALS.get(group, {}).items():
         z = z_scores.get(key)
         if z is None:
