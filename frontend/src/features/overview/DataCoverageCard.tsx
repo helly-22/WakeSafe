@@ -25,10 +25,10 @@ export function DataCoverageCard({ data, className }: { data: AnalyzeResponse; c
         <div className="baseline-progress__row">
           <span>Personal baseline</span>
           <b>
-            {total} of {BASELINE_NIGHTS} nights
+            {Math.min(total, BASELINE_NIGHTS)} of {BASELINE_NIGHTS} nights
           </b>
         </div>
-        <div className="baseline-progress__track" role="img" aria-label={`${total} of ${BASELINE_NIGHTS} nights toward a personal baseline`}>
+        <div className="baseline-progress__track" role="img" aria-label={`${Math.min(total, BASELINE_NIGHTS)} of ${BASELINE_NIGHTS} nights toward a personal baseline`}>
           <span className={baselineReady ? 'is-ready' : ''} style={{ width: `${progress * 100}%` }} />
         </div>
         <p className="fineprint">{baselineReady ? 'Enough nights for baseline comparisons.' : 'Not enough nights yet for baseline comparisons.'}</p>

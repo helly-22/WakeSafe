@@ -33,8 +33,8 @@ export const METRICS: Record<NightMetricKey, MetricMeta> = {
 export const BASELINE_NIGHTS = 14;
 
 /**
- * Fixture feature key for a metric's window average. Placeholder naming
- * (`<field>_mean`) until Dhev's compute_features feature names are agreed.
+ * Older fixture key for a metric's window average (`<field>_mean`). The real
+ * compute_features uses the plain NightRecord field name; see windowMean in series.ts.
  */
 export function meanFeatureKey(key: NightMetricKey): string {
   return `${key}_mean`;
