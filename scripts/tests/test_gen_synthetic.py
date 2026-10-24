@@ -106,7 +106,9 @@ def test_apnea_produces_nonempty_sizeable_z_scores(personas):
 def test_menopause_baseline_then_warm_disturbed_recent(personas):
     p = _by_id(personas, "SYN-MENOPAUSE")
     assert len(p.nights) >= 14
-    assert p.travel_context == {}
+    # The menopause persona carries cycle:* context on its recent nights, and never a travel:* flag.
+    flags = [f for fl in p.travel_context.values() for f in fl]
+    assert flags and all(f.startswith("cycle:") for f in flags)
     recent = p.nights[7:]
     # Warm/disturbed recent nights: skin temp up, efficiency down, no SpO2 dip.
     for n in recent:
@@ -165,12 +167,12 @@ def test_fixtures_write_and_roundtrip_through_contract(tmp_path):
         for n in nights:
             assert isinstance(n, NightRecord)
             assert n.source == "synthetic"
-        # any travel flag follows the data_quality_flags travel:* convention
+        # every context flag follows the data_quality_flags travel:* or cycle:* convention
         for flags in travel.values():
             for f in flags:
-                assert f.startswith("travel:")
+                assert f.startswith(("travel:", "cycle:"))
 
 
 def test_travel_flags_only_on_altitude_and_jetlag(personas):
-    flagged = {p.persona_id for p in personas if p.travel_context}
+    flagged = {p.persona_id for p in personas if any(f.startswith("travel:") for fl in p.travel_context.values() for f in fl)}
     assert flagged == {"SYN-ALTITUDE", "SYN-JETLAG"}
