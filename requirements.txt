@@ -10,3 +10,4 @@ pyyaml
 fastapi
 uvicorn
 httpx
+pyedflib
