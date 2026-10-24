@@ -1,0 +1,53 @@
+# ---- Secrets and credentials (commit .env.example, never .env) ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*token*.json
+whoop_tokens*
+
+# ---- ML data and artifacts (keep the .gitkeep placeholders) ----
+# Downloaded sleep-study datasets and processed features
+ml/data/*
+!ml/data/.gitkeep
+# Trained model artifacts; add an explicit exception only with team approval
+ml/models/*
+!ml/models/.gitkeep
+# Raw sleep-study / physiological recording formats
+*.edf
+*.edf.xml
+*.rml
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.ipynb_checkpoints/
+
+# ---- Node / frontend ----
+node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---- Local databases and generated output ----
+*.sqlite
+*.sqlite3
+*.db
+
+# ---- OS / editor ----
+.DS_Store
+.idea/
+.vscode/
