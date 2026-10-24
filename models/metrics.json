@@ -1,0 +1,32 @@
+{
+  "model": "StandardScaler + LogisticRegression(C=1.0, class_weight=balanced)",
+  "dataset": "PhysioNet Apnea-ECG 1.0.0 learning set (real recordings only)",
+  "validation": "leave-one-person-out (one recording per person)",
+  "n_recordings": 30,
+  "n_apnea": 20,
+  "n_control": 10,
+  "n_borderline_excluded": 5,
+  "auroc": 0.785,
+  "auroc_ci95": [
+    0.584,
+    0.963
+  ],
+  "ci_method": "percentile bootstrap over recordings, 2000 resamples, seed 0",
+  "sensitivity_at_0.5": 0.75,
+  "specificity_at_0.5": 0.7,
+  "features": [
+    "mean_hr_bpm",
+    "resting_hr_bpm",
+    "hrv_rmssd_ms",
+    "sdnn_ms",
+    "hr_minute_sd_bpm"
+  ],
+  "standardized_coefficients": {
+    "mean_hr_bpm": 0.664,
+    "resting_hr_bpm": 0.659,
+    "hrv_rmssd_ms": -0.708,
+    "sdnn_ms": 1.361,
+    "hr_minute_sd_bpm": -0.686
+  },
+  "limitations": "Domain shift: this model was trained on clinical ECG recordings from the PhysioNet Apnea-ECG learning set (a small number of people in a sleep lab), and it is applied to wrist-wearable nightly summaries. Accuracy on WHOOP data is not claimed and has not been measured. The task validated here is separating apnea-group recordings from control-group recordings, not finding apnea in the general public. Borderline recordings were excluded. The sample is small, so the confidence interval is wide. WakeSafe is a screening aid, not a diagnosis."
+}
